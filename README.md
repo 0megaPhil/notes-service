@@ -5,7 +5,7 @@ Reactive backend for a note-taking application used and shared by several small 
 Built with:
 - **Java 21**
 - **Maven** (wrapper included — `./mvnw` / `.\mvnw.cmd` for zero-install builds)
-- **Spring Boot 3.3.5** (modern reactive stack; patterns chosen with Spring Boot 4 / Spring 7 in mind)
+- **Spring Boot 4.0.6** (fully on Spring Boot 4)
 - **Spring WebFlux** (fully non-blocking)
 - **Spring GraphQL** (primary API)
 - **Spring Data R2DBC** (reactive relational access)
