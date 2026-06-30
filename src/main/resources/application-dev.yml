@@ -5,6 +5,10 @@ app:
   data:
     seed-demo: true
 
+spring:
+  webflux:
+    static-path-pattern: /static/**
+
 # You can override other dev-specific settings here
 logging:
   level:

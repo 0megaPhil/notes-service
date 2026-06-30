@@ -22,6 +22,9 @@ spring:
       enabled: true
       path: /graphiql
 
+  webflux:
+    static-path-pattern: /static/**
+
   # Schema initialization for R2DBC (runs on startup for H2)
   sql:
     init:
