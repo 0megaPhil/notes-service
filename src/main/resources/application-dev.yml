@@ -6,6 +6,10 @@ app:
     seed-demo: true
 
 spring:
+  graphql:
+    path: /graphql
+    schema:
+      locations: classpath:schema.graphqls,classpath:graphql/**/*
   webflux:
     static-path-pattern: /static/**
 

@@ -34,6 +34,7 @@ public class SecurityConfig {
             .authorizeExchange(exchanges -> exchanges
                 // Allow actuator health for k8s / load balancers
                 .pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                .pathMatchers("/actuator/**").permitAll()
                 // Public auth endpoint
                 .pathMatchers("/auth/**").permitAll()
                 // Allow the simple frontend (for demo)
