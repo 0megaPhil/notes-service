@@ -7,6 +7,7 @@ Built with:
 - **Maven** (wrapper included — `./mvnw` / `.\mvnw.cmd` for zero-install builds)
 - **Spring Boot 4.0.6** (fully on Spring Boot 4)
 - **Fully reactive** (no `.block()` calls anywhere — pure Project Reactor / WebFlux)
+- **BlockHound** installed at startup: the JVM will fail immediately if any blocking call ever sneaks into a reactive path. This is the strongest practical guarantee that WebFlux is actually being used correctly.
 - **Spring WebFlux** (fully non-blocking)
 - **Spring GraphQL** (primary API)
 - **Spring Data R2DBC** (reactive relational access)
@@ -54,6 +55,8 @@ Or on Windows:
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
+
+**Note:** BlockHound is active. The app will crash on startup (or during request handling) with a clear `BlockingOperationError` + stack trace if any blocking code is called from a Reactor thread.
 
 Alternative with system Maven:
 

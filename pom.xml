@@ -122,6 +122,14 @@
             <artifactId>reactor-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- BlockHound: detects any blocking calls on reactive threads at runtime.
+             Installed on startup for this project to guarantee zero blocking calls in reactive paths. -->
+        <dependency>
+            <groupId>io.projectreactor.tools</groupId>
+            <artifactId>blockhound</artifactId>
+            <version>1.0.9.RELEASE</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.graphql</groupId>
             <artifactId>spring-graphql-test</artifactId>
