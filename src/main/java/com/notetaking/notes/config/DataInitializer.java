@@ -68,7 +68,8 @@ public class DataInitializer {
                     0L
                 )))
                 .then()
-                .block();   // Acceptable inside CommandLineRunner for startup data seeding
+                .doOnError(e -> System.err.println("Data initialization failed: " + e.getMessage()))
+                .subscribe();   // Fire-and-forget; keeps everything fully non-blocking
         };
     }
 }
