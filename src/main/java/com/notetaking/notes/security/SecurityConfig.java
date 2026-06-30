@@ -29,8 +29,8 @@ public class SecurityConfig {
                 .pathMatchers("/auth/**").permitAll()
                 // Allow the simple frontend (for demo)
                 .pathMatchers("/", "/index.html", "/frontend/**").permitAll()
-                // GraphQL endpoint protected by our header filter below
-                .pathMatchers("/graphql").authenticated()
+                // GraphQL is protected by our custom UserContextFilter + service layer permissions
+                .pathMatchers("/graphql").permitAll()
                 .pathMatchers("/graphiql", "/graphiql/**").permitAll() // Dev UI
                 .anyExchange().authenticated()
             )

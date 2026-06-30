@@ -93,10 +93,7 @@ public class NoteService {
                     0L
                 ));
             })
-            .flatMap(note -> {
-                log.debug("Creating note '{}' for user {}", title, note.ownerId());
-                return noteRepository.save(note);
-            });
+            .flatMap(noteRepository::save);
     }
 
     public Mono<Note> updateNote(UUID id, String title, String content) {

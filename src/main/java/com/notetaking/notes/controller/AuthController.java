@@ -24,7 +24,8 @@ public class AuthController {
             .flatMap(str -> Mono.fromCallable(() -> UUID.fromString(str))
                 .onErrorMap(IllegalArgumentException.class, e -> {
                     log.warn("Invalid userId format provided for login: {}", userIdStr);
-                    return new IllegalArgumentException("Invalid userId format", e);
+                    return new org.springframework.web.server.ResponseStatusException(
+                            org.springframework.http.HttpStatus.BAD_REQUEST, "Invalid userId format", e);
                 })
             )
             .map(userId -> {
