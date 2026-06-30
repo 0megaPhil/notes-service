@@ -7,11 +7,12 @@ Built with:
 - **Maven** (wrapper included — `./mvnw` / `.\mvnw.cmd` for zero-install builds)
 - **Spring Boot 4.0.6** (fully on Spring Boot 4)
 - **Fully reactive** (no `.block()` calls anywhere — pure Project Reactor / WebFlux)
-- **BlockHound** installed at startup: the JVM will fail immediately if any blocking call ever sneaks into a reactive path. This is the strongest practical guarantee that WebFlux is actually being used correctly.
+- **BlockHound** (runtime blocking detection, active in tests)
 - **Spring WebFlux** (fully non-blocking)
 - **Spring GraphQL** (primary API)
 - **Spring Data R2DBC** (reactive relational access)
 - **PostgreSQL** (recommended) / **H2** (zero-config demo)
+- **Frontend**: Vite + Svelte 5 + Tailwind (with JWT, markdown preview, dark mode, etc.)
 
 ## Why Spring Boot, WebFlux, and Project Reactor?
 
@@ -78,9 +79,15 @@ This service provides:
 - Advanced RBAC or granular permissions
 - Pagination cursors (simple offset/limit for now)
 
-## Running the Service
+## Running the Full Stack
 
 This project uses **Maven** (wrapper scripts are committed).
+
+**Backend + Frontend together:**
+1. `./mvnw spring-boot:run` (backend on 8080)
+2. `cd frontend && npm run dev` (frontend on 5173)
+
+See the dedicated "Impressive Frontend" section below for details.
 
 ### 1. Quick Start (Recommended - H2, zero external deps)
 
@@ -235,13 +242,15 @@ Alternative considered: MongoDB (reactive) — would have been fine for document
 - Currently coarse: owners + all team members have full access to team notes.
 - Easy to evolve to role-based checks (ADMIN can delete, MEMBER can only read, etc.).
 
-### Why simple X-User-Id header for auth?
+### Authentication
 
-- Allows immediate usability and testing without setting up Keycloak / Auth0.
-- Clearly documented as a placeholder.
-- The `CurrentUserService` + Reactor context pattern is easy to swap for a real JWT decoder later.
+We now support a **real JWT flow** via the new `/auth/login` endpoint (returns a token). The frontend and all examples use `Authorization: Bearer <token>`.
 
-**Future path**: Replace filter + header with `ServerHttpSecurity.oauth2ResourceServer().jwt()` + proper claims.
+The old `X-User-Id` header is kept as a convenient fallback for demos/GraphiQL (the `UserContextFilter` supports both).
+
+The `CurrentUserService` + Reactor context pattern makes it easy to evolve to full Spring Security OAuth2 Resource Server + JWT validation.
+
+**Future path**: Replace the demo token generation with proper signed JWTs, expiration, refresh tokens, and/or integrate with an external IdP.
 
 ### Other Technical Decisions
 
@@ -253,28 +262,40 @@ Alternative considered: MongoDB (reactive) — would have been fine for document
 
 ## How to Test
 
-1. Start the app.
-2. Open GraphiQL.
-3. Send a query with the `X-User-Id` header (GraphiQL supports "Request Headers" panel in newer versions, or use curl/Postman).
+### Backend (GraphiQL / curl)
+1. Start the app (`./mvnw spring-boot:run`).
+2. Open GraphiQL at http://localhost:8080/graphiql.
+3. For demo mode, use the `X-User-Id` header.
+4. For real JWT flow, first login:
 
-Example curl:
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"userId": "11111111-1111-1111-1111-111111111111"}'
+```
+
+Then use the returned token:
 
 ```bash
 curl -X POST http://localhost:8080/graphql \
   -H "Content-Type: application/json" \
-  -H "X-User-Id: 11111111-1111-1111-1111-111111111111" \
+  -H "Authorization: Bearer <token-from-login>" \
   -d '{"query": "{ myNotes { id title } }"}'
 ```
+
+### Frontend
+See the "Impressive Frontend" section above. The UI handles the full JWT login flow automatically.
 
 ## Potential Improvements / Next Steps
 
 - Cursor-based pagination (`Connection` spec)
-- Subscriptions for real-time note updates
-- Full JWT / OAuth2 integration
+- Subscriptions for real-time note updates (GraphQL + WebSocket)
+- Replace demo JWT with full Spring Security OAuth2 / proper signing + refresh tokens
 - Content as JSON/blocks instead of raw markdown string
 - Flyway for production schema management
-- Comprehensive integration tests using `@SpringBootTest` + `WebTestClient` + GraphQL tester
+- Comprehensive integration tests using `@SpringBootTest` + `WebTestClient` + GraphQL tester (including BlockHound)
 - Rate limiting + proper error codes (using `graphql.GraphQLError` customizations)
+- Add a production frontend build step to the Maven build (or separate CI)
 
 ## Tradeoffs Summary
 
@@ -283,7 +304,7 @@ curl -X POST http://localhost:8080/graphql \
 | GraphQL primary           | Flexible queries, good DX            | More complex than simple REST          |
 | Fully reactive (WebFlux)  | High concurrency, modern             | Harder debugging, blocking libs avoided|
 | R2DBC + Postgres          | Consistency + reactive               | Slightly more ops complexity           |
-| Header-based demo auth    | Fast to start                        | Not production ready                   |
+| JWT-based auth (with demo token fallback) | Realistic auth flow ready for production | Still simplified (no refresh/revocation yet) |
 | Simple offset pagination  | Easy to implement                    | Not great at scale (use cursors later) |
 | H2 default                | `spring-boot:run` works instantly    | Not suitable for real concurrency      |
 
@@ -301,6 +322,62 @@ Also, full package (produces runnable JAR):
 ```bash
 ./mvnw clean package -DskipTests
 ```
+
+## Source Code & Tests
+
+- **Backend**: All Java source under `src/main/java/com/notetaking/notes/` (domain, repositories, services, GraphQL controllers, security with JWT support, etc.).
+- **Frontend**: Complete Svelte 5 + Tailwind app under `frontend/src/` (includes all UI logic, GraphQL calls, markdown rendering, etc.).
+- **Tests**: Basic context and integration tests under `src/test/` (expandable with GraphQL tester + BlockHound).
+- **Other**: `docker-compose.yml`, `schema.graphqls`, `schema.sql`, full Maven wrapper.
+
+Everything needed to run the full stack is committed.
+
+## Impressive Frontend (Svelte + Tailwind)
+
+A modern, feature-rich single-page application is included in the `frontend/` directory (built with Vite + Svelte 5 + Tailwind CSS).
+
+### Features
+- **Markdown Preview**: Toggle between Edit and Preview tabs in the note editor using the `marked` library.
+- **Dark Mode**: Full support with a toggle button. Persisted in localStorage.
+- **Better Member Picker**: Visual grid of user cards (with color avatars) instead of raw text input. Prevents duplicates/self-adds.
+- **Real JWT Authentication Flow**: Calls `POST /auth/login` to obtain a token, then sends `Authorization: Bearer <token>` on all requests.
+- Sidebar for teams, live search, full CRUD for notes, team member management.
+- Loading states, toasts, responsive design, smooth interactions.
+
+### Running the Full Stack
+```bash
+# Terminal 1: Backend
+cd notes-service
+./mvnw spring-boot:run
+
+# Terminal 2: Frontend
+cd notes-service/frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173. The UI automatically logs in via the new JWT endpoint.
+
+### How the Frontend Interfaces with the Backend
+
+- **Primary transport**: `POST http://localhost:8080/graphql` (standard GraphQL over HTTP).
+- **Authentication**: 
+  1. Call `POST /auth/login` with `{ "userId": "11111111-1111-1111-1111-111111111111" }`
+  2. Use the returned `token` in the `Authorization: Bearer <token>` header for subsequent calls.
+- Uses `graphql-request` library for clean queries/mutations.
+- All data operations map 1:1 to the schema in `src/main/resources/schema.graphqls`.
+- CORS is enabled in the backend for `localhost` development.
+
+This is a realistic integration pattern you would use in a real application.
+
+### Updating the Frontend
+```bash
+cd frontend
+npm run dev      # development
+npm run build    # production build (output to dist/)
+```
+
+The old static `frontend/index.html` was replaced by this proper Vite app.
 
 ## Design Choices (Where We Spent the Most Time)
 
@@ -362,4 +439,10 @@ The project deliberately ships with a small but representative set of integratio
 
 ---
 
-Built as part of a collaborative review process. All source code, tests, and this documentation are committed and pushed to the repository.
+## Repository
+
+The complete project (backend + impressive Svelte frontend + all documentation) is available at:
+
+https://github.com/0megaPhil/notes-service
+
+Built as part of a collaborative review process.

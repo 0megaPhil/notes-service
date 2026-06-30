@@ -41,6 +41,11 @@ Thumbs.db
 *.env
 application-local.yml
 
+# Frontend (Node)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
 # H2 files if any
 *.mv.db
 *.trace.db
