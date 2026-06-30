@@ -6,6 +6,7 @@ Built with:
 - **Java 21**
 - **Maven** (wrapper included — `./mvnw` / `.\mvnw.cmd` for zero-install builds)
 - **Spring Boot 4.0.6** (fully on Spring Boot 4)
+- **Fully reactive** (no `.block()` calls anywhere — pure Project Reactor / WebFlux)
 - **Spring WebFlux** (fully non-blocking)
 - **Spring GraphQL** (primary API)
 - **Spring Data R2DBC** (reactive relational access)
