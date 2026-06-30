@@ -25,9 +25,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
+/**
+ * Unit tests for {@link TeamService} covering create, add member, and permission setup.
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class TeamServiceTest {
+
+    private static final UUID ALICE_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID TEAM_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
 
     @Mock
     private TeamRepository teamRepository;
@@ -41,37 +47,43 @@ class TeamServiceTest {
     @InjectMocks
     private TeamService teamService;
 
-    private final UUID aliceId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-    private final UUID teamId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
-
+    /**
+     * Prepares current user as OWNER of the test team.
+     */
     @BeforeEach
     void setup() {
         lenient().when(currentUserService.getCurrentUser())
-                .thenReturn(Mono.just(new CurrentUser(aliceId, "Alice")));
+                .thenReturn(Mono.just(new CurrentUser(ALICE_ID, "Alice")));
         lenient().when(currentUserService.getCurrentUserId())
-                .thenReturn(Mono.just(aliceId));
+                .thenReturn(Mono.just(ALICE_ID));
         lenient().when(teamMemberRepository.findByTeamIdAndUserId(any(), any()))
-                .thenReturn(Mono.just(new TeamMember(UUID.randomUUID(), teamId, aliceId, Role.OWNER, Instant.now())));
+                .thenReturn(Mono.just(new TeamMember(UUID.randomUUID(), TEAM_ID, ALICE_ID, Role.OWNER, Instant.now())));
     }
 
+    /**
+     * Happy path for team creation; also verifies owner membership side effect via mocks.
+     */
     @Test
     void createTeamSucceeds() {
-        Team savedTeam = new Team(teamId, "Test Team", aliceId, Instant.now());
+        Team savedTeam = new Team(TEAM_ID, "Test Team", ALICE_ID, Instant.now());
         when(teamRepository.save(any(Team.class))).thenReturn(Mono.just(savedTeam));
-        when(teamMemberRepository.save(any(TeamMember.class))).thenReturn(Mono.just(new TeamMember(UUID.randomUUID(), teamId, aliceId, Role.OWNER, Instant.now())));
+        when(teamMemberRepository.save(any(TeamMember.class))).thenReturn(Mono.just(new TeamMember(UUID.randomUUID(), TEAM_ID, ALICE_ID, Role.OWNER, Instant.now())));
 
         StepVerifier.create(teamService.createTeam("Test Team"))
-                .expectNextMatches(team -> team.name().equals("Test Team") && team.createdBy().equals(aliceId))
+                .expectNextMatches(team -> team.name().equals("Test Team") && team.createdBy().equals(ALICE_ID))
                 .verifyComplete();
     }
 
+    /**
+     * Verifies addMember succeeds when caller has permission.
+     */
     @Test
     void addMemberSucceeds() {
         UUID bobId = UUID.fromString("22222222-2222-2222-2222-222222222222");
-        TeamMember savedMember = new TeamMember(UUID.randomUUID(), teamId, bobId, Role.MEMBER, Instant.now());
+        TeamMember savedMember = new TeamMember(UUID.randomUUID(), TEAM_ID, bobId, Role.MEMBER, Instant.now());
         when(teamMemberRepository.save(any(TeamMember.class))).thenReturn(Mono.just(savedMember));
 
-        StepVerifier.create(teamService.addMember(teamId, bobId, Role.MEMBER))
+        StepVerifier.create(teamService.addMember(TEAM_ID, bobId, Role.MEMBER))
                 .expectNextMatches(member -> member.userId().equals(bobId))
                 .verifyComplete();
     }

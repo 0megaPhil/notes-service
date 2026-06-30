@@ -15,6 +15,10 @@ import reactor.core.publisher.Mono;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Service handling team lifecycle and membership management.
+ * Permission checks (owner/admin) are enforced for mutating operations.
+ */
 @Service
 public class TeamService {
 
@@ -24,6 +28,11 @@ public class TeamService {
     private final TeamMemberRepository teamMemberRepository;
     private final CurrentUserService currentUserService;
 
+    /**
+     * @param teamRepository       team data access
+     * @param teamMemberRepository membership data access
+     * @param currentUserService   reactive current user lookup
+     */
     public TeamService(TeamRepository teamRepository,
                        TeamMemberRepository teamMemberRepository,
                        CurrentUserService currentUserService) {
@@ -32,6 +41,11 @@ public class TeamService {
         this.currentUserService = currentUserService;
     }
 
+    /**
+     * Returns all teams the current user is a member of.
+     *
+     * @return teams visible to caller
+     */
     public Flux<Team> getMyTeams() {
         return currentUserService.getCurrentUserId()
             .flatMapMany(userId ->
@@ -41,6 +55,12 @@ public class TeamService {
             );
     }
 
+    /**
+     * Creates a new team and automatically makes the caller the OWNER.
+     *
+     * @param name team name
+     * @return the persisted team
+     */
     public Mono<Team> createTeam(String name) {
         return currentUserService.getCurrentUser()
             .flatMap(currentUser -> {
@@ -66,6 +86,14 @@ public class TeamService {
             });
     }
 
+    /**
+     * Adds (or updates) a member to a team. Caller must be OWNER or ADMIN.
+     *
+     * @param teamId       target team
+     * @param userIdToAdd  user being added
+     * @param role         desired role (defaults to MEMBER)
+     * @return the saved membership
+     */
     public Mono<TeamMember> addMember(UUID teamId, UUID userIdToAdd, Role role) {
         return currentUserService.getCurrentUserId()
             .flatMap(currentUserId -> canManageTeam(currentUserId, teamId)
@@ -88,6 +116,13 @@ public class TeamService {
                 .flatMap(teamMemberRepository::save));
     }
 
+    /**
+     * Removes a member from the team. Caller must have management rights.
+     *
+     * @param teamId        target team
+     * @param userIdToRemove member to remove
+     * @return true on success
+     */
     public Mono<Boolean> removeMember(UUID teamId, UUID userIdToRemove) {
         return currentUserService.getCurrentUserId()
             .flatMap(currentUserId -> canManageTeam(currentUserId, teamId)
@@ -97,6 +132,12 @@ public class TeamService {
                     .thenReturn(true)));
     }
 
+    /**
+     * Lists members of a team (caller must be a member of the team).
+     *
+     * @param teamId the team
+     * @return members
+     */
     public Flux<TeamMember> getTeamMembers(UUID teamId) {
         return currentUserService.getCurrentUserId()
             .flatMapMany(currentUserId ->

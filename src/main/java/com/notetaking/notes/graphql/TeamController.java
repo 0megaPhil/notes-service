@@ -13,6 +13,9 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+/**
+ * GraphQL controller for team and membership operations.
+ */
 @Controller
 public class TeamController {
 
@@ -22,21 +25,33 @@ public class TeamController {
         this.teamService = teamService;
     }
 
+    /**
+     * Teams the authenticated user belongs to.
+     */
     @QueryMapping
     public Flux<Team> myTeams() {
         return teamService.getMyTeams();
     }
 
+    /**
+     * Lists members of the specified team (caller must be a member).
+     */
     @QueryMapping
     public Flux<TeamMember> teamMembers(@Argument UUID teamId) {
         return teamService.getTeamMembers(teamId);
     }
 
+    /**
+     * Creates a new team (caller becomes owner).
+     */
     @MutationMapping
     public Mono<Team> createTeam(@Argument String name) {
         return teamService.createTeam(name);
     }
 
+    /**
+     * Adds a member/role to a team. Requires management permission.
+     */
     @MutationMapping
     public Mono<TeamMember> addMemberToTeam(@Argument UUID teamId,
                                             @Argument UUID userId,
@@ -44,6 +59,9 @@ public class TeamController {
         return teamService.addMember(teamId, userId, role);
     }
 
+    /**
+     * Removes a member. Requires management permission.
+     */
     @MutationMapping
     public Mono<Boolean> removeMemberFromTeam(@Argument UUID teamId, @Argument UUID userId) {
         return teamService.removeMember(teamId, userId);

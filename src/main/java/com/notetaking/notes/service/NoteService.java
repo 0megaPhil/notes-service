@@ -8,7 +8,6 @@ import com.notetaking.notes.repository.TeamMemberRepository;
 import com.notetaking.notes.security.CurrentUserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -16,6 +15,12 @@ import reactor.core.publisher.Mono;
 import java.time.Instant;
 import java.util.UUID;
 
+/**
+ * Core business service for note operations.
+ * <p>
+ * All operations are fully reactive and enforce ownership + team membership
+ * permissions via the {@link CurrentUserService} and team membership lookups.
+ */
 @Service
 public class NoteService {
 
@@ -25,6 +30,9 @@ public class NoteService {
     private final TeamMemberRepository teamMemberRepository;
     private final CurrentUserService currentUserService;
 
+    /**
+     * Constructs the service with required repositories.
+     */
     public NoteService(NoteRepository noteRepository,
                        TeamMemberRepository teamMemberRepository,
                        CurrentUserService currentUserService) {
@@ -33,6 +41,12 @@ public class NoteService {
         this.currentUserService = currentUserService;
     }
 
+    /**
+     * Retrieves a single note by id if the current user has access.
+     *
+     * @param id the note identifier
+     * @return the note or empty Mono if not found or no access
+     */
     public Mono<Note> getNoteById(UUID id) {
         return currentUserService.getCurrentUserId()
             .flatMap(userId -> noteRepository.findById(id)
@@ -40,25 +54,45 @@ public class NoteService {
             );
     }
 
+    /**
+     * Returns notes visible to the current user (personal + team notes they belong to).
+     * Supports optional filtering by team and pagination via limit/offset.
+     *
+     * @param teamId optional team filter
+     * @param limit  max results (defaulted upstream)
+     * @param offset skip count
+     * @return flux of accessible notes
+     */
     public Flux<Note> getMyNotes(UUID teamId, int limit, int offset) {
+        int effectiveLimit = Math.max(limit, 1);
+        int effectiveOffset = Math.max(offset, 0);
+
         return currentUserService.getCurrentUserId()
             .flatMapMany(userId -> {
-                PageRequest page = PageRequest.of(offset / Math.max(limit, 1), limit);
                 if (teamId != null) {
                     return noteRepository.findByTeamId(teamId)
                         .filterWhen(note -> hasAccess(note, userId));
                 }
-                // Personal notes + all notes from teams the user belongs to
-                // For simplicity: return notes owned by user OR in any of their teams
+                // Personal notes + all notes from teams the user belongs to.
+                // For simplicity in MVP: owned by user OR in any of their teams.
                 return teamMemberRepository.findByUserId(userId)
                     .map(TeamMember::teamId)
                     .flatMap(noteRepository::findByTeamId)
                     .concatWith(noteRepository.findByOwnerId(userId))
                     .distinct(Note::id);
             })
-            .take(limit);
+            .skip(effectiveOffset)
+            .take(effectiveLimit);
     }
 
+    /**
+     * Searches notes visible to the current user by title or content (case-insensitive contains).
+     *
+     * @param query  search text
+     * @param teamId optional team scope
+     * @param limit  result cap
+     * @return matching notes
+     */
     public Flux<Note> searchNotes(String query, UUID teamId, int limit) {
         return currentUserService.getCurrentUserId()
             .flatMapMany(userId -> {
@@ -74,28 +108,53 @@ public class NoteService {
             .take(limit);
     }
 
+    /**
+     * Creates and persists a new note.
+     * If teamId is supplied, verifies the caller is a team member.
+     *
+     * @param title   note title
+     * @param content body
+     * @param teamId  optional team (null = personal)
+     * @return the saved note
+     */
     public Mono<Note> createNote(String title, String content, UUID teamId) {
         return currentUserService.getCurrentUser()
             .flatMap(currentUser -> {
                 UUID userId = currentUser.id();
-                Mono<UUID> resolvedTeam = (teamId != null)
-                    ? ensureTeamMembership(userId, teamId).then(Mono.just(teamId))
-                    : Mono.just((UUID) null);
-
-                return resolvedTeam.map(finalTeamId -> new Note(
-                    UUID.randomUUID(),
-                    title,
-                    content,
-                    userId,
-                    finalTeamId,
-                    Instant.now(),
-                    Instant.now(),
-                    0L
-                ));
+                return Mono.justOrEmpty(teamId)
+                    .flatMap(tid -> ensureTeamMembership(userId, tid).thenReturn(tid))
+                    .map(finalTeamId -> new Note(
+                        UUID.randomUUID(),
+                        title,
+                        content,
+                        userId,
+                        finalTeamId,
+                        Instant.now(),
+                        Instant.now(),
+                        0L
+                    ))
+                    .defaultIfEmpty(new Note(
+                        UUID.randomUUID(),
+                        title,
+                        content,
+                        userId,
+                        null,
+                        Instant.now(),
+                        Instant.now(),
+                        0L
+                    ));
             })
             .flatMap(noteRepository::save);
     }
 
+    /**
+     * Updates title/content of a note the current user can access.
+     *
+     * @param id      note id
+     * @param title   optional new title
+     * @param content optional new content
+     * @return updated note
+     */
     public Mono<Note> updateNote(UUID id, String title, String content) {
         return currentUserService.getCurrentUserId()
             .flatMap(userId -> noteRepository.findById(id)
@@ -108,6 +167,12 @@ public class NoteService {
             );
     }
 
+    /**
+     * Deletes a note if the current user is the owner or a team admin.
+     *
+     * @param id the note id
+     * @return true if deleted, false otherwise
+     */
     public Mono<Boolean> deleteNote(UUID id) {
         return currentUserService.getCurrentUserId()
             .flatMap(userId -> noteRepository.findById(id)

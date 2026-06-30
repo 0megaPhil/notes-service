@@ -16,16 +16,22 @@ import org.mockito.quality.Strictness;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
+import java.time.Instant;
+import java.util.UUID;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-import java.time.Instant;
-import java.util.UUID;
-
+/**
+ * Unit tests for {@link NoteService} using Mockito + StepVerifier.
+ * Focuses on reactive flows and permission-less paths (mocks current user).
+ */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class NoteServiceTest {
+
+    private static final UUID ALICE_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
     @Mock
     private NoteRepository noteRepository;
@@ -39,22 +45,41 @@ class NoteServiceTest {
     @InjectMocks
     private NoteService noteService;
 
-    private final UUID aliceId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-    private final UUID noteId = UUID.randomUUID();
-
+    /**
+     * Stubs the current user for all test cases (Alice).
+     */
     @BeforeEach
     void setup() {
         lenient().when(currentUserService.getCurrentUser())
-                .thenReturn(Mono.just(new CurrentUser(aliceId, "Alice")));
+                .thenReturn(Mono.just(new CurrentUser(ALICE_ID, "Alice")));
         lenient().when(currentUserService.getCurrentUserId())
-                .thenReturn(Mono.just(aliceId));
-        // Default: no team membership (for owner tests the early return is used)
-        lenient().when(teamMemberRepository.findByTeamIdAndUserId(any(), any()))
-                .thenReturn(Mono.empty());
+                .thenReturn(Mono.just(ALICE_ID));
     }
 
+    /**
+     * Verifies create for a personal note succeeds and title is preserved.
+     */
     @Test
-    void servicesAreAvailable() {
-        assert noteService != null;
+    void createNoteReturnsSavedNote() {
+        Note savedNote = new Note(UUID.randomUUID(), "Test Title", "Test Content", ALICE_ID, null, Instant.now(), Instant.now(), 0L);
+        when(noteRepository.save(any(Note.class))).thenReturn(Mono.just(savedNote));
+
+        StepVerifier.create(noteService.createNote("Test Title", "Test Content", null))
+                .expectNextMatches(note -> note.title().equals("Test Title"))
+                .verifyComplete();
+    }
+
+    /**
+     * Verifies that the owner can retrieve their own personal note.
+     */
+    @Test
+    void getNoteByIdReturnsOwnedNote() {
+        UUID noteId = UUID.randomUUID();
+        Note ownedNote = new Note(noteId, "Owned", "Content", ALICE_ID, null, Instant.now(), Instant.now(), 0L);
+        when(noteRepository.findById(noteId)).thenReturn(Mono.just(ownedNote));
+
+        StepVerifier.create(noteService.getNoteById(noteId))
+                .expectNextMatches(note -> note.id().equals(noteId))
+                .verifyComplete();
     }
 }

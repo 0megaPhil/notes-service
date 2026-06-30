@@ -12,11 +12,20 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
+/**
+ * Spring Security configuration for the reactive (WebFlux) stack.
+ * <p>
+ * Deliberately permissive for demo purposes (GraphQL protected at service layer).
+ * See README for production hardening notes.
+ */
 @Configuration
 @EnableWebFluxSecurity
 @EnableReactiveMethodSecurity
 public class SecurityConfig {
 
+    /**
+     * Defines the security filter chain: CORS, disabled CSRF, public paths, etc.
+     */
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
@@ -41,6 +50,9 @@ public class SecurityConfig {
             .build();
     }
 
+    /**
+     * Permissive CORS for demo (allows all origins). Restrict in production.
+     */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();

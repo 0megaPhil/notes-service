@@ -7,9 +7,28 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+/**
+ * Reactive repository for {@link TeamMember} associations.
+ */
 public interface TeamMemberRepository extends ReactiveCrudRepository<TeamMember, UUID> {
+
+    /**
+     * Finds all members of a team.
+     */
     Flux<TeamMember> findByTeamId(UUID teamId);
+
+    /**
+     * Finds all team memberships for a user.
+     */
     Flux<TeamMember> findByUserId(UUID userId);
+
+    /**
+     * Finds a specific membership (used for permission checks).
+     */
     Mono<TeamMember> findByTeamIdAndUserId(UUID teamId, UUID userId);
+
+    /**
+     * Deletes a membership (used for remove member).
+     */
     Mono<Void> deleteByTeamIdAndUserId(UUID teamId, UUID userId);
 }

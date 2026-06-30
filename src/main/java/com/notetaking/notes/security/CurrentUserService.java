@@ -7,10 +7,15 @@ import java.util.UUID;
 
 /**
  * Reactive accessor for the current user in the request context.
+ * <p>
+ * Falls back to a hard-coded demo user when no context is present (useful for tests/dev).
  */
 @Service
 public class CurrentUserService {
 
+    /**
+     * Returns the current user from Reactor context or a demo fallback.
+     */
     public Mono<CurrentUser> getCurrentUser() {
         return Mono.deferContextual(ctx ->
             ctx.<CurrentUser>getOrEmpty(CurrentUser.class)
@@ -22,6 +27,9 @@ public class CurrentUserService {
         );
     }
 
+    /**
+     * Convenience for just the ID.
+     */
     public Mono<UUID> getCurrentUserId() {
         return getCurrentUser().map(CurrentUser::id);
     }

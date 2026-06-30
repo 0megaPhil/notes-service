@@ -7,6 +7,16 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+/**
+ * Reactive repository for {@link Team} entities.
+ */
 public interface TeamRepository extends ReactiveCrudRepository<Team, UUID> {
+
+    /**
+     * Finds teams created by the specified user.
+     *
+     * @param createdBy creator user id
+     * @return flux of teams
+     */
     Flux<Team> findByCreatedBy(UUID createdBy);
 }

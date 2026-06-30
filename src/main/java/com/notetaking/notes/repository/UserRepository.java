@@ -6,6 +6,13 @@ import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
+/**
+ * Reactive repository for {@link User} (primarily used by demo seeder).
+ */
 public interface UserRepository extends ReactiveCrudRepository<User, UUID> {
+
+    /**
+     * Lookup user by email (demo / future use).
+     */
     Mono<User> findByEmail(String email);
 }
