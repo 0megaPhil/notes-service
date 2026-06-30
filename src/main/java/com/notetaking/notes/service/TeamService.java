@@ -6,6 +6,8 @@ import com.notetaking.notes.domain.TeamMember;
 import com.notetaking.notes.repository.TeamMemberRepository;
 import com.notetaking.notes.repository.TeamRepository;
 import com.notetaking.notes.security.CurrentUserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -15,6 +17,8 @@ import java.util.UUID;
 
 @Service
 public class TeamService {
+
+    private static final Logger log = LoggerFactory.getLogger(TeamService.class);
 
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
@@ -46,6 +50,7 @@ public class TeamService {
                     currentUser.id(),
                     Instant.now()
                 );
+                log.info("User {} creating new team '{}'", currentUser.id(), name);
                 return teamRepository.save(team)
                     .flatMap(savedTeam -> {
                         TeamMember ownerMembership = new TeamMember(
@@ -66,6 +71,7 @@ public class TeamService {
             .flatMap(currentUserId -> canManageTeam(currentUserId, teamId)
                 .flatMap(canManage -> {
                     if (!canManage) {
+                        log.warn("User {} attempted to add member without permission to team {}", currentUserId, teamId);
                         return Mono.error(new IllegalStateException("Only team owners/admins can add members"));
                     }
                     TeamMember membership = new TeamMember(
@@ -75,6 +81,7 @@ public class TeamService {
                         role != null ? role : Role.MEMBER,
                         Instant.now()
                     );
+                    log.info("User {} adding member {} to team {}", currentUserId, userIdToAdd, teamId);
                     return teamMemberRepository.save(membership);
                 }));
     }

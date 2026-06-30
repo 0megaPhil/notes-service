@@ -60,3 +60,19 @@ notes:
 # - Use POST /auth/login with {"userId": "..."} to get a Bearer token
 # - Send Authorization: Bearer <token> on GraphQL requests
 # - X-User-Id header still works as fallback for GraphiQL / simple testing
+
+# Data seeding control
+# Set to true to automatically load demo users/teams/notes on startup.
+# This keeps core application logic independent of demo data.
+app:
+  data:
+    seed-demo: false   # Default: no automatic demo data. Use 'demo' profile or set to true for local development.
+
+# Logging configuration (SLF4J + Logback)
+logging:
+  level:
+    com.notetaking.notes: INFO
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

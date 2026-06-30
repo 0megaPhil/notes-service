@@ -1,0 +1,12 @@
+# Development profile with demo data enabled
+# Usage: ./mvnw spring-boot:run -Dspring.profiles.active=dev
+
+app:
+  data:
+    seed-demo: true
+
+# You can override other dev-specific settings here
+logging:
+  level:
+    com.notetaking.notes: DEBUG
+    org.springframework.r2dbc: DEBUG

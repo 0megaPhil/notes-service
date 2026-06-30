@@ -111,6 +111,12 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- SLF4J API (Logging Facade) - Logback is used as the implementation via Spring Boot -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -9,5 +9,8 @@ spring:
       mode: always
       schema-locations: classpath:schema.sql
 
-# Disable or adjust seeding for tests if needed
-# For integration tests we rely on the seeded data from DataInitializer
+# Explicitly disable demo data seeding in tests.
+# Core application logic should be testable without any pre-populated data.
+app:
+  data:
+    seed-demo: false

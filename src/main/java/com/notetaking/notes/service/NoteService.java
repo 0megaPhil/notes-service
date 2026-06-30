@@ -6,6 +6,8 @@ import com.notetaking.notes.domain.TeamMember;
 import com.notetaking.notes.repository.NoteRepository;
 import com.notetaking.notes.repository.TeamMemberRepository;
 import com.notetaking.notes.security.CurrentUserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -16,6 +18,8 @@ import java.util.UUID;
 
 @Service
 public class NoteService {
+
+    private static final Logger log = LoggerFactory.getLogger(NoteService.class);
 
     private final NoteRepository noteRepository;
     private final TeamMemberRepository teamMemberRepository;
@@ -96,7 +100,10 @@ public class NoteService {
                     0L
                 ));
             })
-            .flatMap(noteRepository::save);
+            .flatMap(note -> {
+                log.debug("Creating note '{}' for user {}", title, note.ownerId());
+                return noteRepository.save(note);
+            });
     }
 
     public Mono<Note> updateNote(UUID id, String title, String content) {
@@ -105,6 +112,7 @@ public class NoteService {
                 .filterWhen(note -> hasAccess(note, userId))
                 .flatMap(note -> {
                     Note updated = note.withUpdatedContent(title, content, Instant.now());
+                    log.info("User {} updating note {}", userId, id);
                     return noteRepository.save(updated);
                 })
             );
@@ -114,7 +122,10 @@ public class NoteService {
         return currentUserService.getCurrentUserId()
             .flatMap(userId -> noteRepository.findById(id)
                 .filterWhen(note -> canDelete(note, userId))
-                .flatMap(note -> noteRepository.delete(note).thenReturn(true))
+                .flatMap(note -> {
+                    log.warn("User {} deleting note {}", userId, id);
+                    return noteRepository.delete(note).thenReturn(true);
+                })
             )
             .defaultIfEmpty(false);
     }
