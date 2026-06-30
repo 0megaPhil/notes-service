@@ -12,16 +12,14 @@ import java.util.UUID;
 public class CurrentUserService {
 
     public Mono<CurrentUser> getCurrentUser() {
-        return Mono.deferContextual(ctx -> {
-            if (ctx.hasKey(CurrentUser.class)) {
-                return Mono.just(ctx.get(CurrentUser.class));
-            }
-            // Fallback for tests / direct calls - return a default test user
-            return Mono.just(new CurrentUser(
-                UUID.fromString("11111111-1111-1111-1111-111111111111"),
-                "Demo User"
-            ));
-        });
+        return Mono.deferContextual(ctx ->
+            ctx.<CurrentUser>getOrEmpty(CurrentUser.class)
+                .map(Mono::just)
+                .orElseGet(() -> Mono.just(new CurrentUser(
+                    UUID.fromString("11111111-1111-1111-1111-111111111111"),
+                    "Demo User"
+                )))
+        );
     }
 
     public Mono<UUID> getCurrentUserId() {

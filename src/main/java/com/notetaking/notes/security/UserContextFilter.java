@@ -26,18 +26,16 @@ public class UserContextFilter implements WebFilter {
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
-            // Support demo token format: demo-jwt-<uuid>
             if (token.startsWith("demo-jwt-")) {
-                try {
-                    UUID userId = UUID.fromString(token.substring(9));
-                    CurrentUser currentUser = new CurrentUser(userId, "User-" + userId.toString().substring(0, 8));
-                    return chain.filter(exchange)
-                        .contextWrite(ctx -> ctx.put(CurrentUser.class, currentUser));
-                } catch (Exception ignored) {}
+                return Mono.fromCallable(() -> UUID.fromString(token.substring(9)))
+                    .map(userId -> new CurrentUser(userId, "User-" + userId.toString().substring(0, 8)))
+                    .flatMap(currentUser -> chain.filter(exchange)
+                        .contextWrite(ctx -> ctx.put(CurrentUser.class, currentUser)))
+                    .onErrorResume(IllegalArgumentException.class, e -> chain.filter(exchange));
             }
             // If using real JwtUtil in future:
-            // UUID userId = JwtUtil.getUserIdFromToken(token);
-            // if (userId != null) { ... }
+            // return Mono.fromCallable(() -> JwtUtil.getUserIdFromToken(token))
+            //     .flatMap(...) ...
         }
 
         // 2. Fallback to demo X-User-Id header
@@ -46,13 +44,11 @@ public class UserContextFilter implements WebFilter {
             .getFirst(CurrentUser.HEADER_NAME);
 
         if (userIdHeader != null && !userIdHeader.isBlank()) {
-            try {
-                UUID userId = UUID.fromString(userIdHeader);
-                CurrentUser currentUser = new CurrentUser(userId, "User-" + userId.toString().substring(0, 8));
-                return chain.filter(exchange)
-                    .contextWrite(ctx -> ctx.put(CurrentUser.class, currentUser));
-            } catch (IllegalArgumentException ignored) {
-            }
+            return Mono.fromCallable(() -> UUID.fromString(userIdHeader))
+                .map(userId -> new CurrentUser(userId, "User-" + userId.toString().substring(0, 8)))
+                .flatMap(currentUser -> chain.filter(exchange)
+                    .contextWrite(ctx -> ctx.put(CurrentUser.class, currentUser)))
+                .onErrorResume(IllegalArgumentException.class, e -> chain.filter(exchange));
         }
 
         // Allow request to proceed (resolvers/services will handle missing user)

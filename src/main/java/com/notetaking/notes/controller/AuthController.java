@@ -3,6 +3,7 @@ package com.notetaking.notes.controller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 
 import java.util.Map;
 import java.util.UUID;
@@ -14,23 +15,23 @@ public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     @PostMapping("/login")
-    public Map<String, String> login(@RequestBody Map<String, String> body) {
+    public Mono<Map<String, String>> login(@RequestBody Map<String, String> body) {
         String userIdStr = body.get("userId");
-        if (userIdStr == null || userIdStr.isBlank()) {
-            throw new IllegalArgumentException("userId is required");
-        }
 
-        UUID userId;
-        try {
-            userId = UUID.fromString(userIdStr);
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid userId format provided for login: {}", userIdStr);
-            throw new IllegalArgumentException("Invalid userId format");
-        }
-
-        // Simple "JWT" for demo - in production use proper signing
-        String token = "demo-jwt-" + userId;
-        log.info("User {} logged in (demo JWT issued)", userId);
-        return Map.of("token", token, "userId", userId.toString());
+        return Mono.justOrEmpty(userIdStr)
+            .filter(str -> !str.isBlank())
+            .switchIfEmpty(Mono.error(new IllegalArgumentException("userId is required")))
+            .flatMap(str -> Mono.fromCallable(() -> UUID.fromString(str))
+                .onErrorMap(IllegalArgumentException.class, e -> {
+                    log.warn("Invalid userId format provided for login: {}", userIdStr);
+                    return new IllegalArgumentException("Invalid userId format", e);
+                })
+            )
+            .map(userId -> {
+                // Simple "JWT" for demo - in production use proper signing
+                String token = "demo-jwt-" + userId;
+                log.info("User {} logged in (demo JWT issued)", userId);
+                return Map.of("token", token, "userId", userId.toString());
+            });
     }
 }

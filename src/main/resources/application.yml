@@ -29,11 +29,6 @@ spring:
       schema-locations: classpath:schema.sql
       # For Postgres in real env you would use Flyway or Liquibase
 
-logging:
-  level:
-    com.notetaking: DEBUG
-    org.springframework.r2dbc: INFO
-
 management:
   endpoints:
     web:

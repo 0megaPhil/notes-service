@@ -31,8 +31,8 @@ public class NoteController {
     public Flux<Note> myNotes(@Argument UUID teamId,
                               @Argument Integer limit,
                               @Argument Integer offset) {
-        int effectiveLimit = (limit != null && limit > 0) ? limit : 20;
-        int effectiveOffset = (offset != null && offset > 0) ? offset : 0;
+        int effectiveLimit = java.util.Optional.ofNullable(limit).filter(l -> l > 0).orElse(20);
+        int effectiveOffset = java.util.Optional.ofNullable(offset).filter(o -> o > 0).orElse(0);
         return noteService.getMyNotes(teamId, effectiveLimit, effectiveOffset);
     }
 
@@ -40,7 +40,7 @@ public class NoteController {
     public Flux<Note> searchNotes(@Argument String query,
                                   @Argument UUID teamId,
                                   @Argument Integer limit) {
-        int effectiveLimit = (limit != null && limit > 0) ? limit : 20;
+        int effectiveLimit = java.util.Optional.ofNullable(limit).filter(l -> l > 0).orElse(20);
         return noteService.searchNotes(query, teamId, effectiveLimit);
     }
 

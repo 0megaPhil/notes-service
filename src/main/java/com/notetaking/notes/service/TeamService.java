@@ -69,11 +69,12 @@ public class TeamService {
     public Mono<TeamMember> addMember(UUID teamId, UUID userIdToAdd, Role role) {
         return currentUserService.getCurrentUserId()
             .flatMap(currentUserId -> canManageTeam(currentUserId, teamId)
-                .flatMap(canManage -> {
-                    if (!canManage) {
-                        log.warn("User {} attempted to add member without permission to team {}", currentUserId, teamId);
-                        return Mono.error(new IllegalStateException("Only team owners/admins can add members"));
-                    }
+                .filter(canManage -> canManage)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("User {} attempted to add member without permission to team {}", currentUserId, teamId);
+                    return Mono.error(new IllegalStateException("Only team owners/admins can add members"));
+                }))
+                .map(ignored -> {
                     TeamMember membership = new TeamMember(
                         UUID.randomUUID(),
                         teamId,
@@ -82,27 +83,25 @@ public class TeamService {
                         Instant.now()
                     );
                     log.info("User {} adding member {} to team {}", currentUserId, userIdToAdd, teamId);
-                    return teamMemberRepository.save(membership);
-                }));
+                    return membership;
+                })
+                .flatMap(teamMemberRepository::save));
     }
 
     public Mono<Boolean> removeMember(UUID teamId, UUID userIdToRemove) {
         return currentUserService.getCurrentUserId()
             .flatMap(currentUserId -> canManageTeam(currentUserId, teamId)
-                .flatMap(canManage -> {
-                    if (!canManage) {
-                        return Mono.error(new IllegalStateException("Insufficient permissions"));
-                    }
-                    return teamMemberRepository.deleteByTeamIdAndUserId(teamId, userIdToRemove)
-                        .thenReturn(true);
-                }));
+                .filter(canManage -> canManage)
+                .switchIfEmpty(Mono.error(new IllegalStateException("Insufficient permissions")))
+                .flatMap(ignored -> teamMemberRepository.deleteByTeamIdAndUserId(teamId, userIdToRemove)
+                    .thenReturn(true)));
     }
 
     public Flux<TeamMember> getTeamMembers(UUID teamId) {
         return currentUserService.getCurrentUserId()
             .flatMapMany(currentUserId ->
                 teamMemberRepository.findByTeamIdAndUserId(teamId, currentUserId)
-                    .flatMapMany(m -> teamMemberRepository.findByTeamId(teamId))
+                    .flatMapMany(ignored -> teamMemberRepository.findByTeamId(teamId))
             );
     }
 

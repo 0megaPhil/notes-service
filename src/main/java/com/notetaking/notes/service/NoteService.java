@@ -49,19 +49,12 @@ public class NoteService {
                         .filterWhen(note -> hasAccess(note, userId));
                 }
                 // Personal notes + all notes from teams the user belongs to
+                // For simplicity: return notes owned by user OR in any of their teams
                 return teamMemberRepository.findByUserId(userId)
                     .map(TeamMember::teamId)
-                    .collectList()
-                    .flatMapMany(teamIds -> {
-                        if (teamIds.isEmpty()) {
-                            return noteRepository.findByOwnerId(userId);
-                        }
-                        // For simplicity: return notes owned by user OR in any of their teams
-                        return Flux.fromIterable(teamIds)
-                            .flatMap(noteRepository::findByTeamId)
-                            .concatWith(noteRepository.findByOwnerId(userId))
-                            .distinct(Note::id);
-                    });
+                    .flatMap(noteRepository::findByTeamId)
+                    .concatWith(noteRepository.findByOwnerId(userId))
+                    .distinct(Note::id);
             })
             .take(limit);
     }
