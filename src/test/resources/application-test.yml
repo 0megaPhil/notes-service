@@ -1,0 +1,13 @@
+spring:
+  r2dbc:
+    url: r2dbc:h2:mem:///testdb
+    username: sa
+    password:
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+# Disable or adjust seeding for tests if needed
+# For integration tests we rely on the seeded data from DataInitializer

@@ -69,7 +69,7 @@ public class NoteService {
                 if (teamId != null) {
                     return noteRepository.findByTeamId(teamId)
                         .filterWhen(note -> hasAccess(note, userId)
-                            .map(has -> has && (note.title().toLowerCase().contains(q) || note.content().toLowerCase().contains(q))));
+                            .map(hasAccess -> hasAccess && matchesSearch(note, q)));
                 }
                 return getMyNotes(null, limit * 2, 0) // broader then filter
                     .filter(note -> note.title().toLowerCase().contains(q) || note.content().toLowerCase().contains(q));
@@ -154,5 +154,10 @@ public class NoteService {
         return teamMemberRepository.findByTeamIdAndUserId(teamId, userId)
             .map(m -> m.role() == Role.OWNER || m.role() == Role.ADMIN)
             .defaultIfEmpty(false);
+    }
+
+    private static boolean matchesSearch(Note note, String q) {
+        return note.title().toLowerCase().contains(q) ||
+               note.content().toLowerCase().contains(q);
     }
 }

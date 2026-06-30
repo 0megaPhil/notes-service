@@ -6,6 +6,11 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -15,10 +20,15 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         return http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(ServerHttpSecurity.CsrfSpec::disable)
             .authorizeExchange(exchanges -> exchanges
                 // Allow actuator health for k8s / load balancers
                 .pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                // Public auth endpoint
+                .pathMatchers("/auth/**").permitAll()
+                // Allow the simple frontend (for demo)
+                .pathMatchers("/", "/index.html", "/frontend/**").permitAll()
                 // GraphQL endpoint protected by our header filter below
                 .pathMatchers("/graphql").authenticated()
                 .pathMatchers("/graphiql", "/graphiql/**").permitAll() // Dev UI
@@ -29,5 +39,18 @@ public class SecurityConfig {
             // - JWT via oauth2ResourceServer()
             // - or Spring Security OAuth2 / OIDC
             .build();
+    }
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(List.of("*")); // In production, restrict this!
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }

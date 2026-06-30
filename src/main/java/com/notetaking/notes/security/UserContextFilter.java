@@ -10,16 +10,37 @@ import reactor.core.publisher.Mono;
 import java.util.UUID;
 
 /**
- * Demo authentication filter.
- * Expects header "X-User-Id: <uuid>".
- *
- * In a real system this would validate a JWT or call an auth service.
+ * Authentication filter supporting both:
+ * - Demo: X-User-Id header
+ * - Real: Authorization: Bearer <JWT>
  */
 @Component
 public class UserContextFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        // 1. Try JWT Bearer token (preferred for real flow)
+        String authHeader = exchange.getRequest()
+            .getHeaders()
+            .getFirst(HttpHeaders.AUTHORIZATION);
+
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            // Support demo token format: demo-jwt-<uuid>
+            if (token.startsWith("demo-jwt-")) {
+                try {
+                    UUID userId = UUID.fromString(token.substring(9));
+                    CurrentUser currentUser = new CurrentUser(userId, "User-" + userId.toString().substring(0, 8));
+                    return chain.filter(exchange)
+                        .contextWrite(ctx -> ctx.put(CurrentUser.class, currentUser));
+                } catch (Exception ignored) {}
+            }
+            // If using real JwtUtil in future:
+            // UUID userId = JwtUtil.getUserIdFromToken(token);
+            // if (userId != null) { ... }
+        }
+
+        // 2. Fallback to demo X-User-Id header
         String userIdHeader = exchange.getRequest()
             .getHeaders()
             .getFirst(CurrentUser.HEADER_NAME);
@@ -27,17 +48,14 @@ public class UserContextFilter implements WebFilter {
         if (userIdHeader != null && !userIdHeader.isBlank()) {
             try {
                 UUID userId = UUID.fromString(userIdHeader);
-                // Put the user into Reactor context so services/resolvers can access it reactively
                 CurrentUser currentUser = new CurrentUser(userId, "User-" + userId.toString().substring(0, 8));
                 return chain.filter(exchange)
                     .contextWrite(ctx -> ctx.put(CurrentUser.class, currentUser));
             } catch (IllegalArgumentException ignored) {
-                // Invalid UUID header - will be handled as unauthorized below
             }
         }
 
-        // No valid user header -> let security reject or allow anonymous for now
-        // For this demo we allow proceeding but resolvers will check
+        // Allow request to proceed (resolvers/services will handle missing user)
         return chain.filter(exchange);
     }
 }

@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.note-card {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.note-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.modal {
+  animation: modalPop 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes modalPop {
+  from {
+    transform: scale(0.96) translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.toast {
+  animation: slideIn 0.2s ease forwards;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.team-chip {
+  transition: all 0.1s ease;
+}
+
+.team-chip:hover {
+  background-color: #e0e7ff;
+}

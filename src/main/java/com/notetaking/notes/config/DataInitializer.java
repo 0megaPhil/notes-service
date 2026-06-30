@@ -12,6 +12,7 @@ import com.notetaking.notes.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Configuration
+@Profile("!test")
 public class DataInitializer {
 
     @Bean
