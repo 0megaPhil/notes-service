@@ -89,6 +89,34 @@ This project uses **Maven** (wrapper scripts are committed).
 
 See the dedicated "Impressive Frontend" section below for details.
 
+### Data Seeding & Independent Core Logic
+
+Demo data initialization (users, teams, and sample notes) has been **completely separated** from core application logic.
+
+- By default, `app.data.seed-demo=false` — the application starts with a completely clean database.
+- This allows the core business logic (GraphQL resolvers, services, reactive repositories) to run and be tested independently.
+- Demo data is only loaded when explicitly enabled.
+
+**How to enable demo data:**
+
+```bash
+# Option 1: Enable via system property (recommended for one-off runs)
+./mvnw spring-boot:run -Dapp.data.seed-demo=true
+
+# Option 2: Use the dev profile (recommended for local development)
+./mvnw spring-boot:run -Dspring.profiles.active=dev
+```
+
+The `application-dev.yml` profile enables seeding automatically.
+
+**Why this separation?**
+- Core logic (note CRUD, team membership, permission checks) should not depend on demo data existing.
+- Production deployments must never accidentally load demo data.
+- Tests can run against a pristine schema.
+- You can still seed data manually in the future (e.g., via a management endpoint or Flyway) without touching application startup code.
+
+The seeding logic lives in its own `DemoDataSeeder` service, invoked only by a conditional `CommandLineRunner` when the property is enabled.
+
 ### 1. Quick Start (Recommended - H2, zero external deps)
 
 ```bash
@@ -259,6 +287,73 @@ The `CurrentUserService` + Reactor context pattern makes it easy to evolve to fu
 - Explicit `CreateNoteInput` / `UpdateNoteInput` (good GraphQL practice).
 - Data seeding via `CommandLineRunner` for reproducible demo state.
 - Validation annotations (can be added to inputs).
+- **SLF4J + Logback** for logging (see dedicated section below).
+
+## Logging (SLF4J + Logback)
+
+### Decision: SLF4J as the API + Logback as the Implementation
+
+We standardized on **SLF4J** (Simple Logging Facade for Java) as the logging API and **Logback** as the concrete implementation.
+
+**Why SLF4J?**
+- **Decoupling**: Application code only depends on the SLF4J API (`org.slf4j.Logger`). The actual logging backend (Logback, Log4j2, java.util.logging, etc.) can be swapped at deployment time without changing any code. This is a core principle of good library design and aligns with our "good API methodologies" goal.
+- **Industry standard**: Virtually every Java library and framework (including Spring) uses SLF4J. Using it avoids classpath conflicts and "which logging API?" confusion.
+- **Performance features**: Parameterized logging (`log.info("User {} did {}", user, action)`) avoids unnecessary string concatenation when the log level is disabled.
+- **Ecosystem**: Excellent support for Mapped Diagnostic Context (MDC), markers, and bridging from other logging frameworks.
+
+**Why Logback (via Spring Boot)?**
+- Spring Boot's default choice through `spring-boot-starter-logging`.
+- High performance, asynchronous appenders available, and native deep integration with Spring (e.g., `logback-spring.xml` with profile support).
+- Mature, actively maintained, and battle-tested.
+- We deliberately avoided direct Logback imports in application code so we remain on the SLF4J facade only.
+
+**Why not the alternatives?**
+- **Direct Logback classes** (`ch.qos.logback...`): Creates hard dependency on one implementation and defeats the purpose of a facade.
+- **java.util.logging (JUL)**: Poor performance, limited features, awkward configuration, and poor bridging.
+- **System.out / System.err**: No log levels, no filtering, no structured output, breaks log aggregation in containers/Kubernetes, cannot be configured per environment, and violates the non-blocking reactive contract we worked hard to achieve.
+- **Log4j2 or other backends directly**: Would require excluding Spring Boot's logging starter and managing versions manually — unnecessary complexity when Logback works excellently out of the box.
+
+### Configuration Choices
+
+We use `logback-spring.xml` (instead of plain `logback.xml`) because:
+- It is automatically recognized by Spring Boot.
+- Supports `<springProfile>` for environment-specific behavior.
+- Allows `${...}` property placeholders from Spring's `Environment`.
+- We include Spring Boot's defaults (`defaults.xml`) so we get sensible colored console output and pattern for free.
+
+In `application.yml` we set package-specific levels:
+```yaml
+logging:
+  level:
+    com.notetaking.notes: INFO          # Our code
+    org.springframework.r2dbc: WARN     # Reduce noise from reactive DB layer
+    io.r2dbc: WARN
+```
+
+This gives us good signal-to-noise in production while allowing `DEBUG` on `com.notetaking.notes` during development or when investigating issues.
+
+### Reactive / WebFlux Considerations
+
+Because we chose a fully non-blocking stack:
+- All logging statements must be non-blocking.
+- We use SLF4J's standard synchronous logging (which Logback handles efficiently via its async appender options if needed).
+- Error logging in reactive chains uses `.doOnError(e -> log.error("...", e))` rather than blocking.
+- Future enhancement (see "If We Had More Time"): add MDC context (e.g., correlation ID or current user) so logs from a single request can be correlated even across async boundaries.
+
+### Connection to Other Design Decisions
+
+Logging was intentionally treated as a cross-cutting concern that should not pollute core business logic. This is why:
+- Data seeding (DemoDataSeeder) uses proper logging rather than System prints.
+- We separated data initialization from core logic (see previous section) — the seeder can be disabled without affecting how the rest of the application logs.
+- Consistent with the "fully reactive" and "clean separation" philosophies we applied everywhere else.
+
+All previous `System.err.println` calls were systematically removed and replaced during this work.
+
+### Why This Level of Logging Setup?
+
+- **Minimal but production-ready**: Enough configuration to be useful without over-engineering for a demo/MVP.
+- **Observable**: Structured enough that adding JSON logging or ELK/Loki later is trivial.
+- **Maintainable**: Developers use one consistent API (SLF4J) everywhere.
 
 ## How to Test
 
