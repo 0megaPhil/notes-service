@@ -32,20 +32,21 @@ public class NoteController {
      * Fetch a single note by id (authorization enforced in service).
      */
     @QueryMapping
-    public Mono<Note> note(@Argument UUID id) {
-        return noteService.getNoteById(id);
+    public Mono<Note> note(@Argument String id) {
+        return noteService.getNoteById(UUID.fromString(id));
     }
 
     /**
      * Current user's notes (personal and team-scoped).
      */
     @QueryMapping
-    public Flux<Note> myNotes(@Argument UUID teamId,
+    public Flux<Note> myNotes(@Argument String teamId,
                               @Argument Integer limit,
                               @Argument Integer offset) {
         int effectiveLimit = resolveLimit(limit);
         int effectiveOffset = resolveOffset(offset);
-        return noteService.getMyNotes(teamId, effectiveLimit, effectiveOffset);
+        UUID teamUuid = (teamId != null && !teamId.isBlank()) ? UUID.fromString(teamId) : null;
+        return noteService.getMyNotes(teamUuid, effectiveLimit, effectiveOffset);
     }
 
     /**
@@ -53,10 +54,11 @@ public class NoteController {
      */
     @QueryMapping
     public Flux<Note> searchNotes(@Argument String query,
-                                  @Argument UUID teamId,
+                                  @Argument String teamId,
                                   @Argument Integer limit) {
         int effectiveLimit = resolveLimit(limit);
-        return noteService.searchNotes(query, teamId, effectiveLimit);
+        UUID teamUuid = (teamId != null && !teamId.isBlank()) ? UUID.fromString(teamId) : null;
+        return noteService.searchNotes(query, teamUuid, effectiveLimit);
     }
 
     private int resolveLimit(Integer limit) {
@@ -73,22 +75,23 @@ public class NoteController {
      */
     @MutationMapping
     public Mono<Note> createNote(@Argument CreateNoteInput input) {
-        return noteService.createNote(input.title(), input.content(), input.teamId());
+        UUID teamUuid = (input.teamId() != null && !input.teamId().isBlank()) ? UUID.fromString(input.teamId()) : null;
+        return noteService.createNote(input.title(), input.content(), teamUuid);
     }
 
     /**
      * Updates a note the caller has write access to.
      */
     @MutationMapping
-    public Mono<Note> updateNote(@Argument UUID id, @Argument UpdateNoteInput input) {
-        return noteService.updateNote(id, input.title(), input.content());
+    public Mono<Note> updateNote(@Argument String id, @Argument UpdateNoteInput input) {
+        return noteService.updateNote(UUID.fromString(id), input.title(), input.content());
     }
 
     /**
      * Deletes a note the caller is allowed to delete.
      */
     @MutationMapping
-    public Mono<Boolean> deleteNote(@Argument UUID id) {
-        return noteService.deleteNote(id);
+    public Mono<Boolean> deleteNote(@Argument String id) {
+        return noteService.deleteNote(UUID.fromString(id));
     }
 }

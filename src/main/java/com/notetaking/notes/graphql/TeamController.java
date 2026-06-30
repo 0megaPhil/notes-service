@@ -37,8 +37,8 @@ public class TeamController {
      * Lists members of the specified team (caller must be a member).
      */
     @QueryMapping
-    public Flux<TeamMember> teamMembers(@Argument UUID teamId) {
-        return teamService.getTeamMembers(teamId);
+    public Flux<TeamMember> teamMembers(@Argument String teamId) {
+        return teamService.getTeamMembers(UUID.fromString(teamId));
     }
 
     /**
@@ -53,17 +53,17 @@ public class TeamController {
      * Adds a member/role to a team. Requires management permission.
      */
     @MutationMapping
-    public Mono<TeamMember> addMemberToTeam(@Argument UUID teamId,
-                                            @Argument UUID userId,
+    public Mono<TeamMember> addMemberToTeam(@Argument String teamId,
+                                            @Argument String userId,
                                             @Argument Role role) {
-        return teamService.addMember(teamId, userId, role);
+        return teamService.addMember(UUID.fromString(teamId), UUID.fromString(userId), role);
     }
 
     /**
      * Removes a member. Requires management permission.
      */
     @MutationMapping
-    public Mono<Boolean> removeMemberFromTeam(@Argument UUID teamId, @Argument UUID userId) {
-        return teamService.removeMember(teamId, userId);
+    public Mono<Boolean> removeMemberFromTeam(@Argument String teamId, @Argument String userId) {
+        return teamService.removeMember(UUID.fromString(teamId), UUID.fromString(userId));
     }
 }
