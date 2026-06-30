@@ -73,7 +73,7 @@ public class DemoDataSeeder {
                 .thenMany(Flux.just(
                         new Note(UUID.randomUUID(), "Alice's personal note",
                                 "This is private to Alice. Ideas for the Q3 planning.",
-                                alice.id(), null, now, now, 0L),
+                                alice.id(), null, now, now, null),
                         new Note(UUID.randomUUID(), "Team meeting notes - Sprint 42",
                                 "## Agenda\n- Release timeline\n- Tech debt items\n- On-call rotation",
                                 alice.id(), null, now, now, 0L)

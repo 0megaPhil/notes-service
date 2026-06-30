@@ -1,8 +1,11 @@
 package com.notetaking.notes;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Smoke test ensuring the full Spring Boot application context loads successfully
@@ -12,13 +15,14 @@ import org.springframework.test.context.ActiveProfiles;
 @ActiveProfiles("test")
 class NotesServiceApplicationTests {
 
-    /**
-     * Context load verification. Any misconfiguration or blocking call
-     * (enforced by BlockHound in tests) will cause failure.
-     */
+    @Autowired
+    private org.springframework.context.ApplicationContext context;
+
     @Test
-    void contextLoads() {
-        // Verifies that the Spring context starts without errors
-        // BlockHound is active and will fail the test if blocking calls are introduced
+    void contextLoadsWithCoreBeans() {
+        // Real verification instead of empty method
+        assertThat(context.containsBean("noteService")).isTrue();
+        assertThat(context.containsBean("teamService")).isTrue();
+        assertThat(context.containsBean("noteController")).isTrue();
     }
 }

@@ -14,7 +14,7 @@ import java.util.UUID;
  * @param createdBy user who created the team
  * @param createdAt creation timestamp
  */
-@Table("teams")
+@Table("TEAMS")
 public record Team(
     @Id UUID id,
     String name,

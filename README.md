@@ -6,7 +6,7 @@ Built with:
 - **Java 21**
 - **Maven** (wrapper included — `./mvnw` / `.\mvnw.cmd` for zero-install builds)
 - **Spring Boot 4.0.6** (fully on Spring Boot 4)
-- **Fully reactive** (no `.block()` calls anywhere — pure Project Reactor / WebFlux)
+- **Fully reactive** (no `.block()` calls in main code — pure Project Reactor / WebFlux; tests use Awaitility + StepVerifier for non-blocking verification)
 - **BlockHound** (runtime blocking detection, active in tests)
 - **Spring WebFlux** (fully non-blocking)
 - **Spring GraphQL** (primary API)
@@ -447,7 +447,7 @@ Also, full package (produces runnable JAR):
 
 - **Backend**: All Java source under `src/main/java/com/notetaking/notes/` (domain, repositories, services, GraphQL controllers, security with JWT support, etc.).
 - **Frontend**: Complete Svelte 5 + Tailwind app under `frontend/src/` (includes all UI logic, GraphQL calls, markdown rendering, etc.).
-- **Tests**: Basic context and integration tests under `src/test/` (expandable with GraphQL tester + BlockHound).
+- **Tests**: Real integration + unit tests under `src/test/` (GraphQL controller tests with Awaitility/StepVerifier, service tests with mocks, no empty methods, no blocking in test logic). Javadocs cover public/package-level classes and methods.
 - **Other**: `docker-compose.yml`, `schema.graphqls`, `schema.sql`, full Maven wrapper.
 
 Everything needed to run the full stack is committed.
@@ -536,12 +536,12 @@ Optimistic locking (`@Version` on `Note`) and Java 21 records for domain/DTOs we
 - **Audit / version history**: Track changes to notes over time (a common requirement for team knowledge bases).
 - **GraphQL subscriptions** for real-time updates when a team note is edited.
 - **Proper schema management**: Flyway or Liquibase instead of raw `schema.sql`.
-- **Comprehensive testing**: More unit tests, contract tests, BlockHound in CI, error-path GraphQL tests, and performance tests under load.
+- **Comprehensive testing**: More unit tests, contract tests, BlockHound in CI, error-path GraphQL tests, and performance tests under load. (Recent pass: replaced empty context tests with real ones, added Awaitility, Javadocs, and removed blocking calls from test code.)
 - **Observability**: Full distributed tracing (OpenTelemetry + Micrometer), structured JSON logging, MDC for request/user correlation across the reactive stack, non-blocking request/response logging, log metrics/alerting, and client-server trace correlation. See the detailed future logging improvements in the [Logging (SLF4J + Logback)](#logging-slf4j--logback) section.
 - **Better error handling**: Custom `GraphQLError` implementations with proper error codes and extensions.
 
 ### What We Would Change or Stop Doing
-- Stop relying on seeded demo data and hardcoded UUIDs in tests.
+- ~~Stop relying on seeded demo data and hardcoded UUIDs in tests.~~ (Done for core tests — test profile uses `seed-demo=false`; minimal FK data via schema.sql + Awaitility for setup.)
 - Move away from embedding the entire team membership check logic inside list queries (could lead to N+1 under scale); consider a projection or dedicated read model.
 - Revisit the coarse "all team members have full access" model — it was a deliberate MVP simplification.
 - Consider whether a document store (reactive MongoDB) would have been simpler for the note content itself while keeping relational tables only for teams/members.
@@ -552,8 +552,10 @@ Optimistic locking (`@Version` on `Note`) and Java 21 records for domain/DTOs we
 All production source code lives under `src/main`.
 
 Relevant test classes (run with `./mvnw test`):
-- `NotesServiceApplicationTests` — basic context load (also exercises BlockHound)
-- `GraphQLIntegrationTest` — end-to-end GraphQL queries and mutations using `GraphQlTester` against the seeded data
+- `NotesServiceApplicationTests` — verifies core beans (`NoteService`, `TeamService`, `NoteController`) after loading the full context under the test profile (demo seeding disabled).
+- `GraphQLIntegrationTest` — real integration tests for the GraphQL controllers (`NoteController`, `TeamController`) exercising mutations/queries end-to-end with services and R2DBC. Uses `StepVerifier` + `Awaitility` for non-blocking async setup (no demo data seeding; minimal users inserted via `schema.sql` for FKs).
+
+Tests were reviewed for cleanliness (no unused imports, no empty methods). Javadocs were added to all public and package-level classes/methods. An elegance pass cleaned dead code, fixed pagination, extracted helpers, and adopted Awaitility.
 
 The project deliberately ships with a small but representative set of integration tests rather than hundreds of low-value unit tests, because the value is in the reactive GraphQL + permission flows.
 

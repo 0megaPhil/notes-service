@@ -15,7 +15,7 @@ import java.util.UUID;
  * @param role     role within the team
  * @param joinedAt when the membership was created
  */
-@Table("team_members")
+@Table("TEAM_MEMBERS")
 public record TeamMember(
     @Id UUID id,
     UUID teamId,

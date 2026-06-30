@@ -38,3 +38,8 @@ CREATE TABLE IF NOT EXISTS notes (
 CREATE INDEX IF NOT EXISTS idx_notes_owner ON notes(owner_id);
 CREATE INDEX IF NOT EXISTS idx_notes_team ON notes(team_id);
 CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
+
+-- Minimal users for FK constraints in tests (and demo)
+MERGE INTO users (id, name, email, created_at) KEY (id) VALUES
+ ('11111111-1111-1111-1111-111111111111', 'Alice', 'alice@example.com', CURRENT_TIMESTAMP),
+ ('22222222-2222-2222-2222-222222222222', 'Bob', 'bob@example.com', CURRENT_TIMESTAMP);

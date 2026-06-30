@@ -134,6 +134,13 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Awaitility for non-blocking async assertions in tests (consistent with Project Reactor) -->
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- BlockHound: runtime detection of blocking calls on reactive threads.
              Enabled during tests to protect the WebFlux contract. -->
         <dependency>

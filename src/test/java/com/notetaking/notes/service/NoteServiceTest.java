@@ -61,7 +61,7 @@ class NoteServiceTest {
      */
     @Test
     void createNoteReturnsSavedNote() {
-        Note savedNote = new Note(UUID.randomUUID(), "Test Title", "Test Content", ALICE_ID, null, Instant.now(), Instant.now(), 0L);
+        Note savedNote = new Note(UUID.randomUUID(), "Test Title", "Test Content", ALICE_ID, null, Instant.now(), Instant.now(), null);
         when(noteRepository.save(any(Note.class))).thenReturn(Mono.just(savedNote));
 
         StepVerifier.create(noteService.createNote("Test Title", "Test Content", null))

@@ -131,7 +131,7 @@ public class NoteService {
                         finalTeamId,
                         Instant.now(),
                         Instant.now(),
-                        0L
+                        null
                     ))
                     .defaultIfEmpty(new Note(
                         UUID.randomUUID(),
@@ -141,7 +141,7 @@ public class NoteService {
                         null,
                         Instant.now(),
                         Instant.now(),
-                        0L
+                        null
                     ));
             })
             .flatMap(noteRepository::save);

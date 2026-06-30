@@ -14,7 +14,7 @@ import java.util.UUID;
  * @param email     contact email
  * @param createdAt registration time
  */
-@Table("users")
+@Table("USERS")
 public record User(
     @Id UUID id,
     String name,

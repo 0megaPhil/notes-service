@@ -21,7 +21,7 @@ import java.util.UUID;
  * @param updatedAt last update time
  * @param version   optimistic lock version
  */
-@Table("notes")
+@Table("NOTES")
 public record Note(
     @Id UUID id,
     String title,
