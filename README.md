@@ -4,6 +4,7 @@ Reactive backend for a note-taking application used and shared by several small 
 
 Built with:
 - **Java 21**
+- **Maven** (wrapper included — `./mvnw` / `.\mvnw.cmd` for zero-install builds)
 - **Spring Boot 3.3.5** (modern reactive stack; patterns chosen with Spring Boot 4 / Spring 7 in mind)
 - **Spring WebFlux** (fully non-blocking)
 - **Spring GraphQL** (primary API)
@@ -39,6 +40,8 @@ This service provides:
 
 ## Running the Service
 
+This project uses **Maven** (wrapper scripts are committed).
+
 ### 1. Quick Start (Recommended - H2, zero external deps)
 
 ```bash
@@ -49,6 +52,12 @@ Or on Windows:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
+```
+
+Alternative with system Maven:
+
+```bash
+mvn spring-boot:run
 ```
 
 The service starts on http://localhost:8080
@@ -244,6 +253,15 @@ curl -X POST http://localhost:8080/graphql \
 
 ```bash
 ./mvnw test
+```
+
+Or with system Maven: `mvn test`
+```
+
+Also, full package (produces runnable JAR):
+
+```bash
+./mvnw clean package -DskipTests
 ```
 
 ## Review Notes for Reviewers
