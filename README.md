@@ -355,6 +355,30 @@ All previous `System.err.println` calls were systematically removed and replaced
 - **Observable**: Structured enough that adding JSON logging or ELK/Loki later is trivial.
 - **Maintainable**: Developers use one consistent API (SLF4J) everywhere.
 
+### Potential Future Logging Improvements
+
+If we had more time, we would evolve the logging setup in these directions (many of which tie directly into the broader observability goals listed below):
+
+- **Full MDC (Mapped Diagnostic Context) support**: Automatically propagate correlation IDs, the current user ID (from JWT), request IDs, and trace IDs through the reactive chain. This would allow us to filter logs for a single user session or request even when operations cross multiple async boundaries and threads. In a reactive/WebFlux app this requires careful use of `Context` + `ReactorContext` propagation.
+
+- **Structured / JSON logging**: Switch the console (and add file) appender to output JSON (e.g. using `logstash-logback-encoder` or Logback's built-in JSON encoder). This makes logs machine-readable for centralized platforms (Loki, Elasticsearch, CloudWatch, etc.) and enables powerful querying/filtering on fields like `userId`, `traceId`, `error.code`.
+
+- **Async / high-performance appenders**: Configure Logback's `AsyncAppender` (or `LogbackAsyncAppender`) with a large queue and discarding strategy so that logging never becomes a bottleneck under high load. This is especially relevant because we deliberately chose a non-blocking stack.
+
+- **Non-blocking request/response logging**: Add a reactive `WebFilter` (or `ServerHttpRequestDecorator` / `ServerHttpResponseDecorator`) that logs incoming GraphQL requests and outgoing responses at DEBUG level without blocking the event loop. We would need to be careful to redact sensitive fields (passwords, tokens, personal data).
+
+- **Sensitive data masking / sanitization**: Implement a custom `MessageConverter` or `PatternLayout` that automatically redacts common sensitive patterns (JWTs, emails, IDs) before they reach the appenders. This is critical once real user data is involved.
+
+- **Distributed tracing integration**: Wire Logback with Micrometer Tracing + OpenTelemetry so that log events automatically carry trace/span context. This gives end-to-end visibility from the Svelte frontend through the reactive backend into the database.
+
+- **Environment-specific appenders via Spring profiles**: Use `<springProfile name="prod">` blocks in `logback-spring.xml` to enable file rolling appenders (with size/time-based policies and compression) only in production, while keeping only console logging in dev.
+
+- **Log metrics & alerting**: Expose log-event counters via Micrometer (e.g. count of ERROR logs per endpoint) so we can create dashboards and alerts on logging volume rather than only on application metrics.
+
+- **Client-side logging correlation**: On the Svelte side, generate a `traceId` on the client, pass it in the `X-Trace-Id` header, and have the backend include it in MDC. This would let us correlate a specific user action in the browser console with the exact server logs.
+
+These improvements would move us from "works for a demo" to "enterprise-grade observability" while staying true to the fully reactive principles we applied throughout the stack.
+
 ## How to Test
 
 ### Backend (GraphiQL / curl)
@@ -391,6 +415,7 @@ See the "Impressive Frontend" section above. The UI handles the full JWT login f
 - Comprehensive integration tests using `@SpringBootTest` + `WebTestClient` + GraphQL tester (including BlockHound)
 - Rate limiting + proper error codes (using `graphql.GraphQLError` customizations)
 - Add a production frontend build step to the Maven build (or separate CI)
+- **Observability & Logging enhancements** (see expanded list in the [Logging section](#logging-slf4j--logback) above): MDC propagation, structured JSON logs, distributed tracing (OpenTelemetry), async appenders, non-blocking request logging, and sensitive data redaction.
 
 ## Tradeoffs Summary
 
@@ -512,7 +537,7 @@ Optimistic locking (`@Version` on `Note`) and Java 21 records for domain/DTOs we
 - **GraphQL subscriptions** for real-time updates when a team note is edited.
 - **Proper schema management**: Flyway or Liquibase instead of raw `schema.sql`.
 - **Comprehensive testing**: More unit tests, contract tests, BlockHound in CI, error-path GraphQL tests, and performance tests under load.
-- **Observability**: Distributed tracing, metrics on GraphQL operation latency, and structured error logging.
+- **Observability**: Full distributed tracing (OpenTelemetry + Micrometer), structured JSON logging, MDC for request/user correlation across the reactive stack, non-blocking request/response logging, log metrics/alerting, and client-server trace correlation. See the detailed future logging improvements in the [Logging (SLF4J + Logback)](#logging-slf4j--logback) section.
 - **Better error handling**: Custom `GraphQLError` implementations with proper error codes and extensions.
 
 ### What We Would Change or Stop Doing
