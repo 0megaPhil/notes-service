@@ -12,7 +12,10 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 (or GraphiQL at http://localhost:8080/graphiql).
+Open:
+- Frontend: **http://localhost:5173**
+- GraphiQL (primary GraphQL UI): **http://localhost:8080/graphiql**
+- Swagger UI (REST endpoints / auth): **http://localhost:8080/swagger-ui.html**
 
 See the **Quick Start** section immediately below for reset steps, clean DB mode, and curl examples.
 
@@ -121,9 +124,10 @@ No other installs required — Maven wrapper is included.
 - First run may take a minute (Maven downloading dependencies).
 - Backend listens on **http://localhost:8080**
 - Demo data is automatically loaded (Alice, Bob, Carol + Engineering team + notes)
-- GraphiQL available at http://localhost:8080/graphiql
+- GraphiQL available at **http://localhost:8080/graphiql**
+- Swagger UI (for the REST `/auth` endpoint) available at **http://localhost:8080/swagger-ui.html**
 
-Wait for the **"Demo data seeding completed successfully"** message + "Started ..." before using the UI or GraphiQL.
+Wait for the **"Demo data seeding completed successfully"** message + "Started ..." before using the UI, GraphiQL, or Swagger.
 
 **To start with a completely clean (empty) database** instead of demo data:
 
@@ -190,6 +194,27 @@ Invoke-RestMethod -Uri http://localhost:8080/graphql -Method Post -Headers $head
    ```graphql
    query { myTeams { id name } }
    ```
+
+### API Documentation
+
+**To view the Swagger page** (interactive docs for the REST parts of the API):
+
+- **Swagger UI**: http://localhost:8080/swagger-ui.html  
+- OpenAPI spec (JSON): http://localhost:8080/v3/api-docs  
+
+**REST endpoints (Auth + Actuator):**  
+Swagger / OpenAPI UI (with request/response schemas and examples) documents `POST /auth/login` (with example payloads) and actuator endpoints. The login endpoint accepts a demo user UUID and returns a token you can use on GraphQL.
+
+**Primary API (GraphQL):**  
+The main API is GraphQL. Use GraphiQL for interactive docs and schema:  
+- **GraphiQL**: http://localhost:8080/graphiql  
+
+You can also introspect the schema directly:
+```graphql
+query { __schema { types { name } } }
+```
+
+See Quick Start for auth header examples to use with either.
 
 ### Data Seeding & Independent Core Logic
 

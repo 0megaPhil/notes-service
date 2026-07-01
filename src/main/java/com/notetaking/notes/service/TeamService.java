@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -127,7 +128,7 @@ public class TeamService {
                         UUID.randomUUID(),
                         teamId,
                         userIdToAdd,
-                        role != null ? role : Role.MEMBER,
+                        Optional.ofNullable(role).orElse(Role.MEMBER),
                         Instant.now()
                     );
                     log.info("User {} adding member {} to team {}", currentUserId, userIdToAdd, teamId);
@@ -153,16 +154,15 @@ public class TeamService {
     }
 
     /**
-     * Lists members of a team (caller must be a member of the team).
+     * Lists members of a team for the given user (the caller must be a member or the creator).
+     * <p>
+     * This overload accepts an explicit userId (sourced from GraphQL context or headers in the controller)
+     * for reliable reactive context propagation.
      *
-     * @param teamId the team
-     * @return members
+     * @param teamId        the team
+     * @param currentUserId the user performing the lookup (used for permission check + virtual OWNER fallback)
+     * @return members (may include a virtual OWNER entry for the creator if not explicitly in membership table)
      */
-    public Flux<TeamMember> getTeamMembers(UUID teamId) {
-        return currentUserService.getCurrentUserId()
-            .flatMapMany(currentUserId -> getTeamMembers(teamId, currentUserId));
-    }
-
     public Flux<TeamMember> getTeamMembers(UUID teamId, UUID currentUserId) {
         log.debug("getTeamMembers for team {} as user {}", teamId, currentUserId);
         // Load members first. Then load team to decide on creator.

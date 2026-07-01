@@ -11,6 +11,7 @@ import org.springframework.stereotype.Controller;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -45,7 +46,10 @@ public class NoteController {
                               @Argument Integer offset) {
         int effectiveLimit = resolveLimit(limit);
         int effectiveOffset = resolveOffset(offset);
-        UUID teamUuid = (teamId != null && !teamId.isBlank()) ? UUID.fromString(teamId) : null;
+        UUID teamUuid = Optional.ofNullable(teamId)
+            .filter(t -> !t.isBlank())
+            .map(UUID::fromString)
+            .orElse(null);
         return noteService.getMyNotes(teamUuid, effectiveLimit, effectiveOffset);
     }
 
@@ -57,16 +61,23 @@ public class NoteController {
                                   @Argument String teamId,
                                   @Argument Integer limit) {
         int effectiveLimit = resolveLimit(limit);
-        UUID teamUuid = (teamId != null && !teamId.isBlank()) ? UUID.fromString(teamId) : null;
+        UUID teamUuid = Optional.ofNullable(teamId)
+            .filter(t -> !t.isBlank())
+            .map(UUID::fromString)
+            .orElse(null);
         return noteService.searchNotes(query, teamUuid, effectiveLimit);
     }
 
     private int resolveLimit(Integer limit) {
-        return (limit != null && limit > 0) ? limit : DEFAULT_LIMIT;
+        return Optional.ofNullable(limit)
+            .filter(l -> l > 0)
+            .orElse(DEFAULT_LIMIT);
     }
 
     private int resolveOffset(Integer offset) {
-        return (offset != null && offset > 0) ? offset : 0;
+        return Optional.ofNullable(offset)
+            .filter(o -> o > 0)
+            .orElse(0);
     }
 
 
@@ -75,7 +86,10 @@ public class NoteController {
      */
     @MutationMapping
     public Mono<Note> createNote(@Argument CreateNoteInput input) {
-        UUID teamUuid = (input.teamId() != null && !input.teamId().isBlank()) ? UUID.fromString(input.teamId()) : null;
+        UUID teamUuid = Optional.ofNullable(input.teamId())
+            .filter(t -> !t.isBlank())
+            .map(UUID::fromString)
+            .orElse(null);
         return noteService.createNote(input.title(), input.content(), teamUuid);
     }
 

@@ -19,7 +19,7 @@ import java.util.UUID;
 /**
  * Dedicated component for seeding demo data.
  * This separates initialization concerns from core application logic.
- * 
+ * <p>
  * The seeder can be invoked:
  * - Automatically via conditional CommandLineRunner (see DataInitializer)
  * - Manually from tests or admin endpoints

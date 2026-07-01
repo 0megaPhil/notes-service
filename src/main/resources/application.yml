@@ -81,3 +81,19 @@ logging:
     org.springframework.graphql: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# OpenAPI / Swagger configuration (documents REST endpoints; GraphQL uses GraphiQL)
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+  info:
+    title: Notes Service REST API
+    description: |
+      REST endpoints for authentication and actuator.
+      The primary API is GraphQL at /graphql (use GraphiQL at /graphiql for exploration and the schema).
+    version: 0.1.0
+  packages-to-scan: com.notetaking.notes.controller, org.springframework.boot.actuate
+  paths-to-match: /auth/**, /actuator/**

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Controller;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -41,7 +42,9 @@ public class TeamController {
     public Flux<TeamMember> teamMembers(@Argument String teamId) {
         return Mono.deferContextual(ctx -> {
             CurrentUser cu = ctx.getOrDefault(CurrentUser.class, null);
-            UUID currentUserId = cu != null ? cu.id() : UUID.fromString("11111111-1111-1111-1111-111111111111");
+            UUID currentUserId = Optional.ofNullable(cu)
+                .map(CurrentUser::id)
+                .orElseGet(() -> UUID.fromString("11111111-1111-1111-1111-111111111111"));
             return teamService.getTeamMembers(UUID.fromString(teamId), currentUserId).collectList();
         }).flatMapMany(Flux::fromIterable);
     }

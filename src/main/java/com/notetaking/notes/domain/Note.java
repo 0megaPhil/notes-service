@@ -6,6 +6,7 @@ import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -40,8 +41,8 @@ public record Note(
     public Note withUpdatedContent(String newTitle, String newContent, Instant now) {
         return new Note(
             id,
-            newTitle != null ? newTitle : title,
-            newContent != null ? newContent : content,
+            Optional.ofNullable(newTitle).orElse(title),
+            Optional.ofNullable(newContent).orElse(content),
             ownerId,
             teamId,
             createdAt,

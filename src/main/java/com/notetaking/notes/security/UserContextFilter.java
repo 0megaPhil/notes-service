@@ -1,5 +1,9 @@
 package com.notetaking.notes.security;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -16,13 +20,16 @@ import java.util.UUID;
  * Non-blocking and tolerant of bad input (falls back gracefully).
  */
 @Component
+@NullMarked
 public class UserContextFilter implements WebFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(UserContextFilter.class);
 
     /**
      * Inspects request headers and populates the user in context when possible.
      */
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+    public Mono<Void> filter(@NonNull ServerWebExchange exchange, @NonNull WebFilterChain chain) {
         // 1. Try Bearer (demo-jwt-...) first
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -51,6 +58,9 @@ public class UserContextFilter implements WebFilter {
                 return chain.filter(exchange)
                     .contextWrite(ctx -> ctx.put(CurrentUser.class, currentUser));
             })
-            .onErrorResume(IllegalArgumentException.class, e -> chain.filter(exchange));
+            .onErrorResume(IllegalArgumentException.class, e -> {
+                log.debug("Invalid user ID in header ({}), falling back without context", userIdStr, e);
+                return chain.filter(exchange);
+            });
     }
 }

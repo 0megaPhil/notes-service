@@ -78,10 +78,30 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- JSpecify nullability annotations.
+             Required to properly annotate overrides of framework methods that live under
+             @NullMarked (or Spring's equivalent @NonNullApi/@NonNullFields) packages.
+             Prevents IDE/build warnings like "Not annotated method overrides method annotated with @NullMarked".
+             Scope=provided: available for compilation + static analysis but not bundled in the executable jar. -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <version>1.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Actuator -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- OpenAPI / Swagger UI (for the REST endpoints like /auth/login and Actuator) -->
+        <!-- Note: Main API is GraphQL (documented via GraphiQL at /graphiql). Swagger covers REST parts. -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+            <version>2.6.0</version>
         </dependency>
 
         <!-- JWT support (placeholder for demo, ready for real auth) -->

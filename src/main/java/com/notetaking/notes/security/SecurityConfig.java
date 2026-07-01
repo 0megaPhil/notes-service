@@ -42,6 +42,8 @@ public class SecurityConfig {
                 // GraphQL is protected by our custom UserContextFilter + service layer permissions
                 .pathMatchers("/graphql").permitAll()
                 .pathMatchers("/graphiql", "/graphiql/**").permitAll() // Dev UI
+                // Swagger / OpenAPI UI (for REST endpoints like auth and actuator)
+                .pathMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
                 .pathMatchers("/debug/**").permitAll() // temp diagnostics
                 .anyExchange().authenticated()
             )

@@ -1,5 +1,9 @@
 package com.notetaking.notes.security;
 
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.graphql.server.WebGraphQlInterceptor;
 import org.springframework.graphql.server.WebGraphQlRequest;
 import org.springframework.graphql.server.WebGraphQlResponse;
@@ -17,10 +21,13 @@ import java.util.UUID;
  * GraphQL handler.
  */
 @Component
+@NullMarked
 public class GraphQlUserContextInterceptor implements WebGraphQlInterceptor {
 
+    private static final Logger log = LoggerFactory.getLogger(GraphQlUserContextInterceptor.class);
+
     @Override
-    public Mono<WebGraphQlResponse> intercept(WebGraphQlRequest request, Chain chain) {
+    public Mono<WebGraphQlResponse> intercept(@NonNull WebGraphQlRequest request, @NonNull Chain chain) {
         String userId = request.getHeaders().getFirst(CurrentUser.HEADER_NAME);
         if (userId == null || userId.isBlank()) {
             // also check Bearer for completeness
@@ -35,7 +42,8 @@ public class GraphQlUserContextInterceptor implements WebGraphQlInterceptor {
                 CurrentUser cu = new CurrentUser(uid, "User-" + uid.toString().substring(0, 8));
                 return chain.next(request)
                     .contextWrite(ctx -> ctx.put(CurrentUser.class, cu));
-            } catch (IllegalArgumentException ignored) {
+            } catch (IllegalArgumentException ex) {
+                log.debug("Invalid user ID format in header ({}), falling back without context", userId, ex);
                 // fall through to no context
             }
         }

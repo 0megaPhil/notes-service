@@ -24,7 +24,7 @@ import java.util.List;
 public class GraphQlSourceConfig {
 
     @Bean
-    public GraphQlSource graphQlSource(List<RuntimeWiringConfigurer> configurers) throws IOException {
+    public GraphQlSource graphQlSource(List<RuntimeWiringConfigurer> configurers) {
         // Use schemaResourceBuilder() per Spring GraphQL 1.3.x API (Spring Boot 4)
         GraphQlSource.SchemaResourceBuilder builder = GraphQlSource.schemaResourceBuilder()
                 .schemaResources(new ClassPathResource("graphql/schema.graphqls"));
