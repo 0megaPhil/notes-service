@@ -19,6 +19,8 @@ spring:
 
   graphql:
     path: /graphql
+    webflux:
+      enabled: true
     schema:
       locations: classpath:schema.graphqls,classpath:graphql/**/*
     graphiql:
