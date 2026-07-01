@@ -21,6 +21,68 @@ See the **Quick Start** section immediately below for reset steps, clean DB mode
 
 ---
 
+## Initial Reviewer Cheat Sheet (Fastest Way to Kick the Tires)
+
+Copy-paste these in two terminals.
+
+**Terminal 1 (Backend)**
+```powershell
+.\mvnw.cmd spring-boot:run -Dspring.profiles.active=dev
+```
+
+Wait for `"Demo data seeding completed successfully"` + `"Started NotesServiceApplication"`.
+
+**Terminal 2 (Frontend)**
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173** — it auto-logs in as Alice.
+
+### Key URLs
+| Purpose                  | URL                                      |
+|--------------------------|------------------------------------------|
+| Svelte Frontend          | http://localhost:5173                    |
+| GraphiQL (GraphQL)       | http://localhost:8080/graphiql           |
+| Swagger (REST /auth)     | http://localhost:8080/swagger-ui.html    |
+| OpenAPI JSON             | http://localhost:8080/v3/api-docs        |
+
+**Try Swagger**: Use the `POST /auth/login` operation in the UI with `{"userId": "22222222-2222-2222-2222-222222222222"}` to get a token.
+
+### Quick Auth Tests (PowerShell)
+```powershell
+# Login as Bob and get a token
+$body = @{ userId = "22222222-2222-2222-2222-222222222222" } | ConvertTo-Json
+$token = (Invoke-RestMethod -Uri http://localhost:8080/auth/login -Method Post -Body $body -ContentType "application/json").token
+
+# Call GraphQL with the token
+$headers = @{ Authorization = "Bearer $token" }
+Invoke-RestMethod -Uri http://localhost:8080/graphql -Method Post -Headers $headers `
+  -Body '{"query":"{ myTeams { id name } }"}' -ContentType "application/json"
+```
+
+### Demo User IDs
+- **Alice**: `11111111-1111-1111-1111-111111111111`
+- **Bob**:   `22222222-2222-2222-2222-222222222222`
+- **Carol**: `33333333-3333-3333-3333-333333333333`
+
+**In GraphiQL**: Use the **Headers** tab at the bottom: `{ "X-User-Id": "22222222-2222-2222-2222-222222222222" }`
+
+### Reset Database
+```powershell
+# Stop backend first
+Remove-Item -Recurse -Force target\h2
+```
+Then restart backend with the `dev` profile.
+
+---
+
+See the full **Quick Start** section below for more details, clean DB mode, and GraphQL examples.
+
+---
+
 Reactive backend for a note-taking application used and shared by several small teams.
 
 Built with:
