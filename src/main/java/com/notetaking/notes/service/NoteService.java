@@ -152,7 +152,8 @@ public class NoteService {
     }
 
     /**
-     * Updates title/content of a note the current user can access.
+     * Updates title/content of a note the current user can modify.
+     * Rules: note owner OR team ADMIN/OWNER (members can only modify their own notes).
      *
      * @param id      note id
      * @param title   optional new title
@@ -162,7 +163,11 @@ public class NoteService {
     public Mono<Note> updateNote(UUID id, String title, String content) {
         return currentUserService.getCurrentUserId()
             .flatMap(userId -> noteRepository.findById(id)
-                .filterWhen(note -> hasAccess(note, userId))
+                .filterWhen(note -> canModify(note, userId))
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("User {} attempted to update note {} without permission", userId, id);
+                    return Mono.error(new IllegalStateException("Not allowed to edit this note"));
+                }))
                 .flatMap(note -> {
                     Note updated = note.withUpdatedContent(title, content, Instant.now());
                     log.info("User {} updating note {}", userId, id);
@@ -172,7 +177,7 @@ public class NoteService {
     }
 
     /**
-     * Deletes a note if the current user is the owner or a team admin.
+     * Deletes a note if the current user can modify it (owner or team admin).
      *
      * @param id the note id
      * @return true if deleted, false otherwise
@@ -180,13 +185,16 @@ public class NoteService {
     public Mono<Boolean> deleteNote(UUID id) {
         return currentUserService.getCurrentUserId()
             .flatMap(userId -> noteRepository.findById(id)
-                .filterWhen(note -> canDelete(note, userId))
+                .filterWhen(note -> canModify(note, userId))
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("User {} attempted to delete note {} without permission", userId, id);
+                    return Mono.error(new IllegalStateException("Not allowed to delete this note"));
+                }))
                 .flatMap(note -> {
                     log.warn("User {} deleting note {}", userId, id);
                     return noteRepository.delete(note).thenReturn(true);
                 })
-            )
-            .defaultIfEmpty(false);
+            );
     }
 
     // --- Helper permission logic (centralized - good practice) ---
@@ -199,16 +207,28 @@ public class NoteService {
         if (note.teamId() == null) {
             return Mono.just(false);
         }
-        // All team members have access for this MVP
+        // All team members (including MEMBER role) can VIEW team notes.
         return teamMemberRepository.findByTeamIdAndUserId(note.teamId(), userId)
             .hasElement();
     }
 
-    private Mono<Boolean> canDelete(Note note, UUID userId) {
+    /**
+     * Returns whether the given user can modify (edit or delete) the note.
+     * - The note's owner (creator) can always modify their own note.
+     * - Team OWNER or ADMIN can modify any note belonging to their team.
+     * - Regular MEMBERs can only modify notes they own.
+     */
+    private Mono<Boolean> canModify(Note note, UUID userId) {
         if (note.ownerId().equals(userId)) {
             return Mono.just(true);
         }
         return isTeamAdmin(userId, note.teamId());
+    }
+
+    public Mono<Boolean> canModify(Note note) {
+        return currentUserService.getCurrentUserId()
+            .flatMap(userId -> canModify(note, userId))
+            .defaultIfEmpty(false);
     }
 
     private Mono<Boolean> ensureTeamMembership(UUID userId, UUID teamId) {

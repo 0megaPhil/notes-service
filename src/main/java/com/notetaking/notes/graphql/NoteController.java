@@ -1,12 +1,15 @@
 package com.notetaking.notes.graphql;
 
 import com.notetaking.notes.domain.Note;
+import com.notetaking.notes.domain.User;
 import com.notetaking.notes.dto.CreateNoteInput;
 import com.notetaking.notes.dto.UpdateNoteInput;
+import com.notetaking.notes.repository.UserRepository;
 import com.notetaking.notes.service.NoteService;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.graphql.data.method.annotation.SchemaMapping;
 import org.springframework.stereotype.Controller;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -24,9 +27,11 @@ public class NoteController {
     private static final int DEFAULT_LIMIT = 20;
 
     private final NoteService noteService;
+    private final UserRepository userRepository;
 
-    public NoteController(NoteService noteService) {
+    public NoteController(NoteService noteService, UserRepository userRepository) {
         this.noteService = noteService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -66,6 +71,25 @@ public class NoteController {
             .map(UUID::fromString)
             .orElse(null);
         return noteService.searchNotes(query, teamUuid, effectiveLimit);
+    }
+
+    /**
+     * Field resolver to provide human-readable author name for a Note.
+     * Looks up the owner via UserRepository (demo users are pre-seeded).
+     */
+    @SchemaMapping(typeName = "Note")
+    public Mono<String> ownerName(Note note) {
+        return userRepository.findById(note.ownerId())
+            .map(User::name)
+            .defaultIfEmpty("Unknown");
+    }
+
+    /**
+     * Field resolver: whether current authenticated user can edit/delete this note.
+     */
+    @SchemaMapping(typeName = "Note")
+    public Mono<Boolean> canModify(Note note) {
+        return noteService.canModify(note);
     }
 
     private int resolveLimit(Integer limit) {

@@ -45,9 +45,12 @@ type Note {
     title: String!
     content: String!
     ownerId: ID!
+    ownerName: String!
     teamId: ID
     createdAt: String!
     updatedAt: String!
+    """Whether the current user can edit or delete this note (note owner or team ADMIN/OWNER)"""
+    canModify: Boolean!
 }
 
 type Team {

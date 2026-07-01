@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { 
     Plus, Search, Users, Edit2, Trash2, X, Check, User, 
-    ChevronRight, Home, Moon, Sun, Eye, Edit 
+    ChevronRight, Home, Moon, Sun, Eye, Edit, UserPlus 
   } from 'lucide-svelte';
   import { GraphQLClient } from 'graphql-request';
   import { marked } from 'marked';
@@ -35,6 +35,8 @@
   let showAddMemberModal = $state(false);
   let editingNote = $state(null);
   let selectedTeamForMembers = $state(null);
+  let currentTeamMembers = $state([]);
+  let addRole = $state('MEMBER');
 
   // Form state
   let noteForm = $state({ title: '', content: '', teamId: '' });
@@ -88,7 +90,8 @@
       // Update client headers
       client = new GraphQLClient(API_URL, {
         headers: {
-          'Authorization': `Bearer ${jwtToken}`
+          'Authorization': `Bearer ${jwtToken}`,
+          'X-User-Id': userId
         }
       });
       
@@ -102,6 +105,11 @@
     } catch (e) {
       addToast('Login failed - using demo mode', 'error');
       // Fallback to header
+      client = new GraphQLClient(API_URL, {
+        headers: {
+          'X-User-Id': userId
+        }
+      });
       currentUserId = userId;
       await loadTeams();
       await loadNotes();
@@ -125,7 +133,7 @@
 
   // Data loading
   async function loadTeams() {
-    const query = `query { myTeams { id name } }`;
+    const query = `query { myTeams { id name createdBy } }`;
     const data = await executeQuery(query);
     teams = data.myTeams || [];
   }
@@ -134,7 +142,7 @@
     const query = `
       query($teamId: ID, $limit: Int) {
         myNotes(teamId: $teamId, limit: $limit) {
-          id title content teamId createdAt
+          id title content teamId createdAt ownerName canModify
         }
       }
     `;
@@ -150,7 +158,7 @@
     const query = `
       query($query: String!, $teamId: ID) {
         searchNotes(query: $query, teamId: $teamId, limit: 30) {
-          id title content teamId createdAt
+          id title content teamId createdAt ownerName canModify
         }
       }
     `;
@@ -163,7 +171,7 @@
     const query = `
       mutation($input: CreateNoteInput!) {
         createNote(input: $input) {
-          id title content teamId createdAt
+          id title content teamId createdAt ownerName canModify
         }
       }
     `;
@@ -185,7 +193,7 @@
     const query = `
       mutation($id: ID!, $input: UpdateNoteInput!) {
         updateNote(id: $id, input: $input) {
-          id title content
+          id title content ownerName canModify
         }
       }
     `;
@@ -220,16 +228,16 @@
   }
 
   // Member management
-  async function addMemberToTeam(teamId, userId) {
+  async function addMemberToTeam(teamId, userId, role = 'MEMBER') {
     const query = `
-      mutation($teamId: ID!, $userId: ID!) {
-        addMemberToTeam(teamId: $teamId, userId: $userId) {
+      mutation($teamId: ID!, $userId: ID!, $role: Role) {
+        addMemberToTeam(teamId: $teamId, userId: $userId, role: $role) {
           userId role
         }
       }
     `;
-    await executeQuery(query, { teamId, userId });
-    addToast('Member added');
+    await executeQuery(query, { teamId, userId, role });
+    addToast('Member added / role updated');
   }
 
   async function removeMemberFromTeam(teamId, userId) {
@@ -294,29 +302,39 @@
     }
   }
 
-  function openTeamManagement(team) {
+  async function openTeamManagement(team) {
     selectedTeamForMembers = team;
+    currentTeamMembers = await getTeamMembers(team.id);
+
+    const myRole = currentTeamMembers.find(m => m.userId === currentUserId)?.role;
+    const canManage = myRole === 'OWNER' || myRole === 'ADMIN' || team.createdBy === currentUserId;
+
+    if (!canManage) {
+      addToast('Only team owners and admins can manage members', 'error');
+      showAddMemberModal = false;
+      selectedTeamForMembers = null;
+      currentTeamMembers = [];
+      return;
+    }
+
     showAddMemberModal = true;
   }
 
-  async function handleAddMember(selectedUserId) {
+  async function handleAddMember(selectedUserId, role = 'MEMBER') {
     if (!selectedUserId || !selectedTeamForMembers) return;
     
-    // Prevent adding self or duplicates
-    const currentMembers = await getTeamMembers(selectedTeamForMembers.id);
-    if (currentMembers.some(m => m.userId === selectedUserId)) {
-      addToast('User already in team', 'error');
-      return;
+    try {
+      await addMemberToTeam(selectedTeamForMembers.id, selectedUserId, role);
+      showAddMemberModal = false;
+      selectedTeamForMembers = null;
+      await loadTeams();
+    } catch (e) {
+      // error already toasted in executeQuery
     }
-    
-    await addMemberToTeam(selectedTeamForMembers.id, selectedUserId);
-    showAddMemberModal = false;
-    selectedTeamForMembers = null;
-    await loadTeams();
   }
 
   async function getTeamMembers(teamId) {
-    const query = `query($teamId: ID!) { teamMembers(teamId: $teamId) { userId } }`;
+    const query = `query($teamId: ID!) { teamMembers(teamId: $teamId) { userId role } }`;
     const data = await executeQuery(query, { teamId });
     return data.teamMembers || [];
   }
@@ -425,8 +443,9 @@
               <button 
                 onclick={() => openTeamManagement(team)}
                 class="opacity-0 group-hover:opacity-100 px-2 text-slate-400 hover:text-indigo-500"
+                title="Manage team members"
               >
-                <Users size={15} />
+                <UserPlus size={15} />
               </button>
             </div>
           {/each}
@@ -484,21 +503,29 @@
                     <h3 class="font-semibold text-lg text-slate-900 dark:text-white leading-tight pr-2">
                       {note.title}
                     </h3>
-                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <button onclick={() => editNote(note)} class="p-1.5 text-slate-400 hover:text-indigo-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-                        <Edit2 size={15} />
-                      </button>
-                      <button onclick={() => deleteNote(note.id)} class="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
+                    {#if note.canModify}
+                      <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <button onclick={() => editNote(note)} class="p-1.5 text-slate-400 hover:text-indigo-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                          <Edit2 size={15} />
+                        </button>
+                        <button onclick={() => deleteNote(note.id)} class="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    {/if}
                   </div>
                   <p class="text-sm text-slate-600 dark:text-slate-400 line-clamp-3 leading-relaxed mb-4">
                     {note.content}
                   </p>
                 </div>
                 <div class="flex items-center justify-between text-xs pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <span class="text-slate-400">{new Date(note.createdAt).toLocaleDateString()}</span>
+                  <div class="flex items-center gap-1.5 text-slate-400">
+                    <span>{new Date(note.createdAt).toLocaleDateString()}</span>
+                    {#if note.ownerName}
+                      <span class="text-slate-300 dark:text-slate-500">·</span>
+                      <span>by {note.ownerName}</span>
+                    {/if}
+                  </div>
                   {#if note.teamId}
                     <span class="px-2.5 py-px bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 rounded text-[10px] font-medium">TEAM</span>
                   {:else}
@@ -582,28 +609,70 @@
       <div class="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6">
         <div class="flex justify-between mb-4">
           <div>
-            <h3 class="font-semibold">Add member to {selectedTeamForMembers.name}</h3>
-            <p class="text-sm text-slate-500 dark:text-slate-400">Choose a demo user</p>
+            <h3 class="font-semibold">Manage members: {selectedTeamForMembers.name}</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400">Add users or promote to ADMIN (owner only)</p>
           </div>
           <button onclick={() => { showAddMemberModal = false; selectedTeamForMembers = null; }}><X /></button>
         </div>
 
-        <div class="grid grid-cols-1 gap-2">
-          {#each demoUsers.filter(u => u.id !== currentUserId) as user}
+        <!-- Role selector for new adds -->
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-slate-500 mb-1">Role when adding new member:</label>
+          <select bind:value={addRole} class="w-full border rounded-xl px-3 py-2 bg-white dark:bg-slate-800">
+            <option value="MEMBER">MEMBER - view and edit notes</option>
+            <option value="ADMIN">ADMIN - can also add/remove members</option>
+          </select>
+        </div>
+
+        <!-- Add new members -->
+        <div class="mb-2 text-xs font-semibold text-slate-500">Add to team</div>
+        <div class="grid grid-cols-1 gap-2 mb-4">
+          {#each demoUsers.filter(u => u.id !== currentUserId && !currentTeamMembers.some(m => m.userId === u.id)) as user}
             <button 
-              onclick={() => handleAddMember(user.id)}
+              onclick={() => handleAddMember(user.id, addRole)}
               class="flex items-center gap-3 px-4 py-3 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl text-left border border-slate-100 dark:border-slate-800"
             >
               <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style="background: {user.color}">
                 {user.name[0]}
               </div>
-              <div>
+              <div class="flex-1">
                 <div class="font-medium">{user.name}</div>
                 <div class="text-xs text-slate-400">{user.id}</div>
               </div>
+              <div class="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded">Add as {addRole}</div>
             </button>
           {/each}
         </div>
+        {#if demoUsers.filter(u => u.id !== currentUserId && !currentTeamMembers.some(m => m.userId === u.id)).length === 0}
+          <p class="text-sm text-slate-500 text-center py-1 mb-4">All demo users are already in this team.</p>
+        {/if}
+
+        <!-- Current members / promote to admin -->
+        {#if currentTeamMembers.filter(m => m.userId !== currentUserId && m.role === 'MEMBER').length > 0}
+          <div class="mb-2 text-xs font-semibold text-slate-500">Promote to ADMIN</div>
+          <div class="grid grid-cols-1 gap-2">
+            {#each currentTeamMembers.filter(m => m.userId !== currentUserId && m.role === 'MEMBER') as member}
+              {@const user = demoUsers.find(u => u.id === member.userId)}
+              {#if user}
+                <button 
+                  onclick={() => handleAddMember(member.userId, 'ADMIN')}
+                  class="flex items-center gap-3 px-4 py-3 hover:bg-amber-50 dark:hover:bg-amber-950 rounded-2xl text-left border border-amber-100 dark:border-amber-800"
+                >
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style="background: {user.color}">
+                    {user.name[0]}
+                  </div>
+                  <div class="flex-1">
+                    <div class="font-medium">{user.name} <span class="text-xs text-amber-600">(MEMBER)</span></div>
+                    <div class="text-xs text-slate-400">{user.id}</div>
+                  </div>
+                  <div class="text-xs px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-700 dark:text-amber-300 rounded">Promote to ADMIN</div>
+                </button>
+              {/if}
+            {/each}
+          </div>
+        {/if}
+
+        <p class="text-[10px] text-slate-400 mt-4 text-center">Only team owners can manage members and promote to ADMIN.</p>
       </div>
     </div>
   {/if}

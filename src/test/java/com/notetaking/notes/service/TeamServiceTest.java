@@ -65,9 +65,15 @@ class TeamServiceTest {
                 .thenReturn(Mono.just(new CurrentUser(ALICE_ID, "Alice")));
         lenient().when(currentUserService.getCurrentUserId())
                 .thenReturn(Mono.just(ALICE_ID));
-        lenient().when(teamMemberRepository.findByTeamIdAndUserId(any(), any()))
+        // For the *caller* permission check (Alice as OWNER)
+        lenient().when(teamMemberRepository.findByTeamIdAndUserId(TEAM_ID, ALICE_ID))
                 .thenReturn(Mono.just(new TeamMember(UUID.randomUUID(), TEAM_ID, ALICE_ID, Role.OWNER, Instant.now())));
-        // Mock transactional: execute the callback and wrap result in Flux (for .next() in service)
+        // For adding Bob (no existing membership) -> empty, will hit insert path
+        UUID bobId = UUID.fromString("22222222-2222-2222-2222-222222222222");
+        lenient().when(teamMemberRepository.findByTeamIdAndUserId(TEAM_ID, bobId))
+                .thenReturn(Mono.empty());
+
+        // Mock transactional for both styles used in the service
         lenient().when(transactionalOperator.execute(any()))
                 .thenAnswer(inv -> {
                     @SuppressWarnings("unchecked")
@@ -79,6 +85,8 @@ class TeamServiceTest {
                     }
                     return Flux.just(result);
                 });
+        lenient().when(transactionalOperator.transactional(any(Mono.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
     }
 
     /**
@@ -102,7 +110,7 @@ class TeamServiceTest {
     void addMemberSucceeds() {
         UUID bobId = UUID.fromString("22222222-2222-2222-2222-222222222222");
         TeamMember savedMember = new TeamMember(UUID.randomUUID(), TEAM_ID, bobId, Role.MEMBER, Instant.now());
-        when(teamMemberRepository.save(any(TeamMember.class))).thenReturn(Mono.just(savedMember));
+        when(entityTemplate.insert(any(TeamMember.class))).thenReturn(Mono.just(savedMember));
 
         StepVerifier.create(teamService.addMember(TEAM_ID, bobId, Role.MEMBER))
                 .expectNextMatches(member -> member.userId().equals(bobId))

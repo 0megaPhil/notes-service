@@ -337,6 +337,8 @@ query {
     content
     teamId
     createdAt
+    ownerName
+    canModify
   }
 }
 ```
@@ -428,8 +430,10 @@ Alternative considered: MongoDB (reactive) â€” would have been fine for doc
 ### Permission & Authorization Model
 
 - Centralized in service layer (not spread in controllers).
-- Currently coarse: owners + all team members have full access to team notes.
-- Easy to evolve to role-based checks (ADMIN can delete, MEMBER can only read, etc.).
+- **Notes**: Any team member can *view* team notes. Edit and delete are restricted: only the note's owner (creator) or team `OWNER`/`ADMIN` can modify a note. Regular `MEMBER`s can only edit/delete notes they created.
+- **Teams**: Only `OWNER` or `ADMIN` can add/remove/promote members. Creator is automatically `OWNER`.
+- The `canModify` field is exposed on notes in GraphQL so the UI can conditionally show edit/delete controls.
+- The `ownerName` (resolved from the user) is also exposed on notes for display in the UI.
 
 ### Authentication
 
@@ -700,7 +704,7 @@ Optimistic locking (`@Version` on `Note`) and Java 21 records for domain/DTOs we
 ### What We Would Change or Stop Doing
 - ~~Stop relying on seeded demo data and hardcoded UUIDs in tests.~~ (Done for core tests â€” test profile uses `seed-demo=false`; minimal FK data via schema.sql + Awaitility for setup.)
 - Move away from embedding the entire team membership check logic inside list queries (could lead to N+1 under scale); consider a projection or dedicated read model.
-- Revisit the coarse "all team members have full access" model â€” it was a deliberate MVP simplification.
+- ~~Revisit the coarse "all team members have full access" model~~ (Improved for edit/delete: owners + admins only; view remains open to members. See Permission section.)
 - Consider whether a document store (reactive MongoDB) would have been simpler for the note content itself while keeping relational tables only for teams/members.
 - Avoid manual `collectList()` + `flatMap` patterns where a more declarative reactive query could suffice.
 

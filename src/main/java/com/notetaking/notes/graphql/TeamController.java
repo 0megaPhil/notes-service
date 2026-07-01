@@ -32,7 +32,13 @@ public class TeamController {
      */
     @QueryMapping
     public Flux<Team> myTeams() {
-        return teamService.getMyTeams();
+        return Mono.deferContextual(ctx -> {
+            CurrentUser cu = ctx.getOrDefault(CurrentUser.class, null);
+            UUID currentUserId = Optional.ofNullable(cu)
+                .map(CurrentUser::id)
+                .orElseGet(() -> UUID.fromString("11111111-1111-1111-1111-111111111111"));
+            return Mono.just(currentUserId);
+        }).flatMapMany(teamService::getMyTeams);
     }
 
     /**

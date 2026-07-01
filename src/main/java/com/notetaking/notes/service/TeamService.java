@@ -61,16 +61,24 @@ public class TeamService {
      */
     public Flux<Team> getMyTeams() {
         return currentUserService.getCurrentUserId()
-            .flatMapMany(userId ->
-                Flux.concat(
-                    // teams via explicit membership
-                    teamMemberRepository.findByUserId(userId)
-                        .map(TeamMember::teamId)
-                        .flatMap(teamRepository::findById),
-                    // also teams created by user (creator is implicitly a member/owner)
-                    teamRepository.findByCreatedBy(userId)
-                ).distinct(Team::id)
-            );
+            .flatMapMany(this::getMyTeams);
+    }
+
+    /**
+     * Returns all teams the given user is a member of (or created).
+     * Used by GraphQL resolvers that extract the user from context explicitly.
+     */
+    public Flux<Team> getMyTeams(UUID userId) {
+        log.debug("getMyTeams called for userId: {}", userId);
+        return Flux.concat(
+            // teams via explicit membership
+            teamRepository.findByMemberUserId(userId)
+                .doOnNext(t -> log.debug("Found team {} via membership for user {}", t.id(), userId)),
+            // also teams created by user (creator is implicitly a member/owner)
+            teamRepository.findByCreatedBy(userId)
+                .doOnNext(t -> log.debug("Found created team {} for user {}", t.id(), userId))
+        ).distinct(Team::id)
+            .doOnNext(t -> log.debug("myTeams for {} includes team {}", userId, t.id()));
     }
 
     /**
@@ -116,6 +124,7 @@ public class TeamService {
      * @return the saved membership
      */
     public Mono<TeamMember> addMember(UUID teamId, UUID userIdToAdd, Role role) {
+        final Role targetRole = Optional.ofNullable(role).orElse(Role.MEMBER);
         return currentUserService.getCurrentUserId()
             .flatMap(currentUserId -> canManageTeam(currentUserId, teamId)
                 .filter(canManage -> canManage)
@@ -123,18 +132,39 @@ public class TeamService {
                     log.warn("User {} attempted to add member without permission to team {}", currentUserId, teamId);
                     return Mono.error(new IllegalStateException("Only team owners/admins can add members"));
                 }))
-                .map(ignored -> {
-                    TeamMember membership = new TeamMember(
-                        UUID.randomUUID(),
-                        teamId,
-                        userIdToAdd,
-                        Optional.ofNullable(role).orElse(Role.MEMBER),
-                        Instant.now()
-                    );
-                    log.info("User {} adding member {} to team {}", currentUserId, userIdToAdd, teamId);
-                    return membership;
-                })
-                .flatMap(teamMemberRepository::save));
+                .then(
+                    transactionalOperator.transactional(
+                        teamMemberRepository.findByTeamIdAndUserId(teamId, userIdToAdd)
+                            .flatMap(existing -> {
+                                if (existing.role() == targetRole) {
+                                    log.info("User {} already has role {} in team {}", userIdToAdd, targetRole, teamId);
+                                    return Mono.just(existing);
+                                }
+                                TeamMember updated = new TeamMember(
+                                    existing.id(),
+                                    existing.teamId(),
+                                    existing.userId(),
+                                    targetRole,
+                                    existing.joinedAt()
+                                );
+                                log.info("User {} promoting {} to {} in team {}", currentUserId, userIdToAdd, targetRole, teamId);
+                                return teamMemberRepository.save(updated);
+                            })
+                            .switchIfEmpty(Mono.defer(() -> {
+                                TeamMember membership = new TeamMember(
+                                    UUID.randomUUID(),
+                                    teamId,
+                                    userIdToAdd,
+                                    targetRole,
+                                    Instant.now()
+                                );
+                                log.info("User {} adding {} as {} to team {}", currentUserId, userIdToAdd, targetRole, teamId);
+                                return entityTemplate.insert(membership);
+                            }))
+                    )
+                )
+                .delayElement(Duration.ofMillis(150))
+            );
     }
 
     /**

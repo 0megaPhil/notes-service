@@ -1,6 +1,7 @@
 package com.notetaking.notes.repository;
 
 import com.notetaking.notes.domain.TeamMember;
+import org.springframework.data.r2dbc.repository.Query;
 import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -20,6 +21,7 @@ public interface TeamMemberRepository extends ReactiveCrudRepository<TeamMember,
     /**
      * Finds all team memberships for a user.
      */
+    @Query("SELECT * FROM TEAM_MEMBERS WHERE USER_ID = :userId")
     Flux<TeamMember> findByUserId(UUID userId);
 
     /**
