@@ -1,9 +1,9 @@
-# Team Notes Service
+﻿# Team Notes Service
 
-**TL;DR — Any Engineer Can Run This:**
+**TL;DR â€” Any Engineer Can Run This:**
 
 ```powershell
-# Terminal 1 — Backend with demo data
+# Terminal 1 â€” Backend with demo data
 .\mvnw.cmd spring-boot:run -Dspring.profiles.active=dev
 
 # Terminal 2
@@ -14,8 +14,10 @@ npm run dev
 
 Open:
 - Frontend: **http://localhost:5173**
-- GraphiQL (primary GraphQL UI): **http://localhost:8080/graphiql**
-- Swagger UI (REST endpoints / auth): **http://localhost:8080/swagger-ui.html**
+- GraphiQL (primary GraphQL UI + full API docs): **http://localhost:8080/graphiql**
+- Swagger UI (REST only â€“ auth + actuator): **http://localhost:8080/swagger-ui.html**
+
+> **Note for reviewers:** The real application API is GraphQL (documented in GraphiQL). Swagger only covers the small REST surface.
 
 See the **Quick Start** section immediately below for reset steps, clean DB mode, and curl examples.
 
@@ -39,17 +41,21 @@ npm install
 npm run dev
 ```
 
-Open **http://localhost:5173** — it auto-logs in as Alice.
+Open **http://localhost:5173** â€” it auto-logs in as Alice.
 
 ### Key URLs
 | Purpose                  | URL                                      |
 |--------------------------|------------------------------------------|
 | Svelte Frontend          | http://localhost:5173                    |
-| GraphiQL (GraphQL)       | http://localhost:8080/graphiql           |
-| Swagger (REST /auth)     | http://localhost:8080/swagger-ui.html    |
+| GraphiQL (primary GraphQL UI) | http://localhost:8080/graphiql      |
+| Swagger (REST only)      | http://localhost:8080/swagger-ui.html    |
 | OpenAPI JSON             | http://localhost:8080/v3/api-docs        |
 
+**Note:** Swagger only shows the tiny REST surface (`/auth/login` + actuator). The real API (notes, teams, etc.) is GraphQL â€” use GraphiQL for that.
+
 **Try Swagger**: Use the `POST /auth/login` operation in the UI with `{"userId": "22222222-2222-2222-2222-222222222222"}` to get a token.
+
+> **Reminder for reviewers:** Swagger will only ever show `/auth/login` + actuator endpoints. All application functionality (notes, teams, members) is exposed exclusively through GraphQL.
 
 ### Quick Auth Tests (PowerShell)
 ```powershell
@@ -87,9 +93,9 @@ Reactive backend for a note-taking application used and shared by several small 
 
 Built with:
 - **Java 21**
-- **Maven** (wrapper included — `./mvnw` / `.\mvnw.cmd` for zero-install builds)
+- **Maven** (wrapper included â€” `./mvnw` / `.\mvnw.cmd` for zero-install builds)
 - **Spring Boot 4.0.6** (fully on Spring Boot 4)
-- **Fully reactive** (no `.block()` calls in main code — pure Project Reactor / WebFlux; tests use Awaitility + StepVerifier for non-blocking verification)
+- **Fully reactive** (no `.block()` calls in main code â€” pure Project Reactor / WebFlux; tests use Awaitility + StepVerifier for non-blocking verification)
 - **BlockHound** (runtime blocking detection, active in tests)
 - **Spring WebFlux** (fully non-blocking)
 - **Spring GraphQL** (primary API)
@@ -118,7 +124,7 @@ The requirements explicitly asked to "use webflux". Beyond that:
 - **Native integration with reactive data access**: Pairs perfectly with R2DBC so the entire request lifecycle stays non-blocking.
 
 **Alternatives considered**:
-- **Spring MVC + Servlet stack**: Much simpler for traditional CRUD (easier stack traces, familiar filters/interceptors). It would have been faster to develop initially. However, it would violate the WebFlux requirement and perform worse under concurrent team usage. For low-to-medium traffic internal tools, MVC is often the pragmatic choice — we deliberately went the other way to honor the spec and demonstrate modern reactive patterns.
+- **Spring MVC + Servlet stack**: Much simpler for traditional CRUD (easier stack traces, familiar filters/interceptors). It would have been faster to develop initially. However, it would violate the WebFlux requirement and perform worse under concurrent team usage. For low-to-medium traffic internal tools, MVC is often the pragmatic choice â€” we deliberately went the other way to honor the spec and demonstrate modern reactive patterns.
 - **Other reactive frameworks** (Quarkus Reactive, Vert.x): Good alternatives, but again, the explicit ask was for Spring WebFlux.
 
 ### Project Reactor
@@ -169,7 +175,7 @@ This service provides:
 - Node.js 18+ and npm (run `node --version`)
 - (Optional) Docker if you want to try Postgres
 
-No other installs required — Maven wrapper is included.
+No other installs required â€” Maven wrapper is included.
 
 ### 1. Run Backend with Demo Data (Recommended)
 
@@ -186,8 +192,10 @@ No other installs required — Maven wrapper is included.
 - First run may take a minute (Maven downloading dependencies).
 - Backend listens on **http://localhost:8080**
 - Demo data is automatically loaded (Alice, Bob, Carol + Engineering team + notes)
-- GraphiQL available at **http://localhost:8080/graphiql**
-- Swagger UI (for the REST `/auth` endpoint) available at **http://localhost:8080/swagger-ui.html**
+- GraphiQL (primary GraphQL UI + full API) available at **http://localhost:8080/graphiql**
+- Swagger UI (REST only â€“ auth + actuator) available at **http://localhost:8080/swagger-ui.html**
+
+> **Reminder:** The actual business API (notes, teams, etc.) is GraphQL, not REST. Use GraphiQL for the real thing.
 
 Wait for the **"Demo data seeding completed successfully"** message + "Started ..." before using the UI, GraphiQL, or Swagger.
 
@@ -259,17 +267,18 @@ Invoke-RestMethod -Uri http://localhost:8080/graphql -Method Post -Headers $head
 
 ### API Documentation
 
-**To view the Swagger page** (interactive docs for the REST parts of the API):
+> **Important:** The application's primary API is **GraphQL**. Swagger only covers the small REST surface (authentication + actuator). Use **GraphiQL** for the full application API.
 
+**Swagger (REST only â€“ Auth + Actuator)**
 - **Swagger UI**: http://localhost:8080/swagger-ui.html  
 - OpenAPI spec (JSON): http://localhost:8080/v3/api-docs  
 
-**REST endpoints (Auth + Actuator):**  
-Swagger / OpenAPI UI (with request/response schemas and examples) documents `POST /auth/login` (with example payloads) and actuator endpoints. The login endpoint accepts a demo user UUID and returns a token you can use on GraphQL.
+Swagger documents:
+- `POST /auth/login` (demo auth that returns a token)
+- Actuator endpoints (health, metrics, etc.)
 
-**Primary API (GraphQL):**  
-The main API is GraphQL. Use GraphiQL for interactive docs and schema:  
-- **GraphiQL**: http://localhost:8080/graphiql  
+**Primary API (GraphQL)**
+- **GraphiQL** (interactive explorer + full schema): http://localhost:8080/graphiql  
 
 You can also introspect the schema directly:
 ```graphql
@@ -282,7 +291,7 @@ See Quick Start for auth header examples to use with either.
 
 Demo data initialization (users, teams, and sample notes) has been **completely separated** from core application logic.
 
-- By default, `app.data.seed-demo=false` — the application starts with a completely clean database.
+- By default, `app.data.seed-demo=false` â€” the application starts with a completely clean database.
 - This allows the core business logic (GraphQL resolvers, services, reactive repositories) to run and be tested independently.
 - Demo data is only loaded when explicitly enabled.
 
@@ -402,11 +411,11 @@ mutation {
 - Avoids over/under fetching common in REST for note + team use cases.
 - Spring GraphQL + WebFlux gives us a clean, strongly typed, reactive experience.
 
-We still expose health via Actuator (REST).
+We still expose a tiny REST surface (only `/auth/login` + Actuator endpoints) for convenience. This is why Swagger only shows those endpoints â€” the real API lives in GraphQL.
 
 ### Why WebFlux + R2DBC?
 
-See the dedicated "Why Spring Boot, WebFlux, and Project Reactor?" section above for the full rationale. In short: the requirements explicitly called for WebFlux, and the reactive approach provides better scalability for concurrent team usage while keeping the entire pipeline (HTTP → service → database) non-blocking. R2DBC was the natural choice to avoid mixing blocking JDBC drivers.
+See the dedicated "Why Spring Boot, WebFlux, and Project Reactor?" section above for the full rationale. In short: the requirements explicitly called for WebFlux, and the reactive approach provides better scalability for concurrent team usage while keeping the entire pipeline (HTTP â†’ service â†’ database) non-blocking. R2DBC was the natural choice to avoid mixing blocking JDBC drivers.
 
 ### Storage Choice: PostgreSQL (with H2 fallback)
 
@@ -414,7 +423,7 @@ See the dedicated "Why Spring Boot, WebFlux, and Project Reactor?" section above
 - R2DBC + Postgres is mature.
 - H2 is used for instant local development without Docker.
 
-Alternative considered: MongoDB (reactive) — would have been fine for document-oriented notes but we preferred consistency and relational queries for teams.
+Alternative considered: MongoDB (reactive) â€” would have been fine for document-oriented notes but we preferred consistency and relational queries for teams.
 
 ### Permission & Authorization Model
 
@@ -463,7 +472,7 @@ We standardized on **SLF4J** (Simple Logging Facade for Java) as the logging API
 - **Direct Logback classes** (`ch.qos.logback...`): Creates hard dependency on one implementation and defeats the purpose of a facade.
 - **java.util.logging (JUL)**: Poor performance, limited features, awkward configuration, and poor bridging.
 - **System.out / System.err**: No log levels, no filtering, no structured output, breaks log aggregation in containers/Kubernetes, cannot be configured per environment, and violates the non-blocking reactive contract we worked hard to achieve.
-- **Log4j2 or other backends directly**: Would require excluding Spring Boot's logging starter and managing versions manually — unnecessary complexity when Logback works excellently out of the box.
+- **Log4j2 or other backends directly**: Would require excluding Spring Boot's logging starter and managing versions manually â€” unnecessary complexity when Logback works excellently out of the box.
 
 ### Configuration Choices
 
@@ -496,7 +505,7 @@ Because we chose a fully non-blocking stack:
 
 Logging was intentionally treated as a cross-cutting concern that should not pollute core business logic. This is why:
 - Data seeding (DemoDataSeeder) uses proper logging rather than System prints.
-- We separated data initialization from core logic (see previous section) — the seeder can be disabled without affecting how the rest of the application logs.
+- We separated data initialization from core logic (see previous section) â€” the seeder can be disabled without affecting how the rest of the application logs.
 - Consistent with the "fully reactive" and "clean separation" philosophies we applied everywhere else.
 
 All previous `System.err.println` calls were systematically removed and replaced during this work.
@@ -533,7 +542,7 @@ These improvements would move us from "works for a demo" to "enterprise-grade ob
 
 ## How to Test
 
-See the **Quick Start** section near the top of this README — it contains the clearest copy-paste instructions for both backend + frontend and direct API usage (with and without JWT).
+See the **Quick Start** section near the top of this README â€” it contains the clearest copy-paste instructions for both backend + frontend and direct API usage (with and without JWT).
 
 ### GraphiQL
 See the **Quick GraphiQL Test** section in the Quick Start above.
@@ -660,7 +669,7 @@ We chose Spring GraphQL over a traditional REST controller layer with OpenAPI. Q
 **Why?** 
 - Notes + team data naturally benefits from flexible client-driven selection (a client might want just titles + team names in one call).
 - Avoids the common N+1/over-fetching problems of fixed REST shapes.
-- Aligns with "good API methodologies" for modern backends — clients (web, mobile, or other services) can evolve independently.
+- Aligns with "good API methodologies" for modern backends â€” clients (web, mobile, or other services) can evolve independently.
 - Spring GraphQL + WebFlux provides excellent type safety and reactive execution out of the box.
 
 We still kept the schema explicit with dedicated `CreateNoteInput`/`UpdateNoteInput` types.
@@ -689,9 +698,9 @@ Optimistic locking (`@Version` on `Note`) and Java 21 records for domain/DTOs we
 - **Better error handling**: Custom `GraphQLError` implementations with proper error codes and extensions.
 
 ### What We Would Change or Stop Doing
-- ~~Stop relying on seeded demo data and hardcoded UUIDs in tests.~~ (Done for core tests — test profile uses `seed-demo=false`; minimal FK data via schema.sql + Awaitility for setup.)
+- ~~Stop relying on seeded demo data and hardcoded UUIDs in tests.~~ (Done for core tests â€” test profile uses `seed-demo=false`; minimal FK data via schema.sql + Awaitility for setup.)
 - Move away from embedding the entire team membership check logic inside list queries (could lead to N+1 under scale); consider a projection or dedicated read model.
-- Revisit the coarse "all team members have full access" model — it was a deliberate MVP simplification.
+- Revisit the coarse "all team members have full access" model â€” it was a deliberate MVP simplification.
 - Consider whether a document store (reactive MongoDB) would have been simpler for the note content itself while keeping relational tables only for teams/members.
 - Avoid manual `collectList()` + `flatMap` patterns where a more declarative reactive query could suffice.
 
@@ -700,8 +709,8 @@ Optimistic locking (`@Version` on `Note`) and Java 21 records for domain/DTOs we
 All production source code lives under `src/main`.
 
 Relevant test classes (run with `./mvnw test`):
-- `NotesServiceApplicationTests` — verifies core beans (`NoteService`, `TeamService`, `NoteController`) after loading the full context under the test profile (demo seeding disabled).
-- `GraphQLIntegrationTest` — real integration tests for the GraphQL controllers (`NoteController`, `TeamController`) exercising mutations/queries end-to-end with services and R2DBC. Uses `StepVerifier` + `Awaitility` for non-blocking async setup (no demo data seeding; minimal users inserted via `schema.sql` for FKs).
+- `NotesServiceApplicationTests` â€” verifies core beans (`NoteService`, `TeamService`, `NoteController`) after loading the full context under the test profile (demo seeding disabled).
+- `GraphQLIntegrationTest` â€” real integration tests for the GraphQL controllers (`NoteController`, `TeamController`) exercising mutations/queries end-to-end with services and R2DBC. Uses `StepVerifier` + `Awaitility` for non-blocking async setup (no demo data seeding; minimal users inserted via `schema.sql` for FKs).
 
 Tests were reviewed for cleanliness (no unused imports, no empty methods). Javadocs were added to all public and package-level classes/methods. An elegance pass cleaned dead code, fixed pagination, extracted helpers, and adopted Awaitility.
 

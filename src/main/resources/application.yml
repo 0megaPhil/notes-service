@@ -83,6 +83,7 @@ logging:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
 # OpenAPI / Swagger configuration (documents REST endpoints; GraphQL uses GraphiQL)
+# Using springdoc 3.x for compatibility with Spring Boot 4 / Spring Framework 6.2+
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -92,8 +93,10 @@ springdoc:
   info:
     title: Notes Service REST API
     description: |
-      REST endpoints for authentication and actuator.
-      The primary API is GraphQL at /graphql (use GraphiQL at /graphiql for exploration and the schema).
+      REST endpoints for authentication (/auth/login) and Spring Boot Actuator (health, metrics, etc.).
+      The primary API is GraphQL at /graphql (use GraphiQL at /graphiql for the full schema, queries, and mutations for notes/teams).
     version: 0.1.0
   packages-to-scan: com.notetaking.notes.controller, org.springframework.boot.actuate
   paths-to-match: /auth/**, /actuator/**
+  # Include actuator endpoints in the Swagger UI (creates a dedicated "actuator" group)
+  show-actuator: true
