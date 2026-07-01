@@ -46,8 +46,11 @@ public class UserContextFilter implements WebFilter {
     private Mono<Void> attachUserAndContinue(String userIdStr, ServerWebExchange exchange, WebFilterChain chain) {
         return Mono.fromCallable(() -> UUID.fromString(userIdStr))
             .map(userId -> new CurrentUser(userId, "User-" + userId.toString().substring(0, 8)))
-            .flatMap(currentUser -> chain.filter(exchange)
-                .contextWrite(ctx -> ctx.put(CurrentUser.class, currentUser)))
+            .flatMap(currentUser -> {
+                exchange.getAttributes().put(CurrentUser.class.getName(), currentUser);
+                return chain.filter(exchange)
+                    .contextWrite(ctx -> ctx.put(CurrentUser.class, currentUser));
+            })
             .onErrorResume(IllegalArgumentException.class, e -> chain.filter(exchange));
     }
 }

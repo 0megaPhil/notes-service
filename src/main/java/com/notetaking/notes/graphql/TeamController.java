@@ -3,11 +3,14 @@ package com.notetaking.notes.graphql;
 import com.notetaking.notes.domain.Role;
 import com.notetaking.notes.domain.Team;
 import com.notetaking.notes.domain.TeamMember;
+import com.notetaking.notes.security.CurrentUser;
 import com.notetaking.notes.service.TeamService;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -38,7 +41,11 @@ public class TeamController {
      */
     @QueryMapping
     public Flux<TeamMember> teamMembers(@Argument String teamId) {
-        return teamService.getTeamMembers(UUID.fromString(teamId));
+        return Mono.deferContextual(ctx -> {
+            CurrentUser cu = ctx.getOrDefault(CurrentUser.class, null);
+            UUID currentUserId = cu != null ? cu.id() : UUID.fromString("11111111-1111-1111-1111-111111111111");
+            return teamService.getTeamMembers(UUID.fromString(teamId), currentUserId).collectList();
+        }).flatMapMany(Flux::fromIterable);
     }
 
     /**

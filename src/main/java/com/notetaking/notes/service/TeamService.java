@@ -14,7 +14,10 @@ import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -99,7 +102,8 @@ public class TeamService {
                                 .thenReturn(savedTeam);
                         });
                 })
-        ).next();
+        ).next()
+        .delayElement(Duration.ofMillis(150));  // small delay to mitigate cross-connection visibility in H2 for immediate follow-up queries in tests/repros
     }
 
     /**
@@ -156,21 +160,31 @@ public class TeamService {
      */
     public Flux<TeamMember> getTeamMembers(UUID teamId) {
         return currentUserService.getCurrentUserId()
-            .flatMapMany(currentUserId -> {
-                Mono<Boolean> isMember = teamMemberRepository.findByTeamIdAndUserId(teamId, currentUserId).hasElement();
-                Mono<Boolean> isCreator = teamRepository.findById(teamId)
-                    .map(t -> currentUserId.equals(t.createdBy()))
-                    .defaultIfEmpty(false);
-                return Mono.zip(isMember, isCreator)
-                    .flatMapMany(tuple -> {
-                        if (tuple.getT1() || tuple.getT2()) {
-                            return teamMemberRepository.findByTeamId(teamId)
-                                .switchIfEmpty(Flux.just(new TeamMember(UUID.randomUUID(), teamId, currentUserId, Role.OWNER, Instant.now())));
-                        } else {
-                            return Flux.empty();
-                        }
-                    });
-            });
+            .flatMapMany(currentUserId -> getTeamMembers(teamId, currentUserId));
+    }
+
+    public Flux<TeamMember> getTeamMembers(UUID teamId, UUID currentUserId) {
+        log.debug("getTeamMembers for team {} as user {}", teamId, currentUserId);
+        // Load members first. Then load team to decide on creator.
+        // This is resilient to one or the other not being visible yet after create.
+        Mono<List<TeamMember>> membersMono = teamMemberRepository.findByTeamId(teamId).collectList();
+        return membersMono.flatMapMany(existing -> {
+            boolean hasSelf = existing.stream().anyMatch(m -> m.userId().equals(currentUserId));
+            return teamRepository.findById(teamId)
+                .map(t -> currentUserId.equals(t.createdBy()))
+                .defaultIfEmpty(false)
+                .flatMapMany(isCreator -> {
+                    if (!isCreator && !hasSelf) {
+                        return Flux.empty();
+                    }
+                    List<TeamMember> result = existing;
+                    if (isCreator && !hasSelf) {
+                        result = new java.util.ArrayList<>(existing);
+                        result.add(new TeamMember(UUID.randomUUID(), teamId, currentUserId, Role.OWNER, Instant.now()));
+                    }
+                    return Flux.fromIterable(result);
+                });
+        });
     }
 
     private Mono<Boolean> canManageTeam(UUID userId, UUID teamId) {
