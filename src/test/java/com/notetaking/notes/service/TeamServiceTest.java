@@ -15,6 +15,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
+import org.springframework.transaction.reactive.TransactionalOperator;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -44,6 +47,12 @@ class TeamServiceTest {
     @Mock
     private CurrentUserService currentUserService;
 
+    @Mock
+    private R2dbcEntityTemplate entityTemplate;
+
+    @Mock
+    private TransactionalOperator transactionalOperator;
+
     @InjectMocks
     private TeamService teamService;
 
@@ -58,6 +67,18 @@ class TeamServiceTest {
                 .thenReturn(Mono.just(ALICE_ID));
         lenient().when(teamMemberRepository.findByTeamIdAndUserId(any(), any()))
                 .thenReturn(Mono.just(new TeamMember(UUID.randomUUID(), TEAM_ID, ALICE_ID, Role.OWNER, Instant.now())));
+        // Mock transactional: execute the callback and wrap result in Flux (for .next() in service)
+        lenient().when(transactionalOperator.execute(any()))
+                .thenAnswer(inv -> {
+                    @SuppressWarnings("unchecked")
+                    org.springframework.transaction.reactive.TransactionCallback<?> callback = 
+                        (org.springframework.transaction.reactive.TransactionCallback<?>) inv.getArgument(0);
+                    Object result = callback.doInTransaction(null);
+                    if (result instanceof reactor.core.publisher.Mono) {
+                        return ((reactor.core.publisher.Mono<?>) result).flux();
+                    }
+                    return Flux.just(result);
+                });
     }
 
     /**
@@ -66,8 +87,8 @@ class TeamServiceTest {
     @Test
     void createTeamSucceeds() {
         Team savedTeam = new Team(TEAM_ID, "Test Team", ALICE_ID, Instant.now());
-        when(teamRepository.save(any(Team.class))).thenReturn(Mono.just(savedTeam));
-        when(teamMemberRepository.save(any(TeamMember.class))).thenReturn(Mono.just(new TeamMember(UUID.randomUUID(), TEAM_ID, ALICE_ID, Role.OWNER, Instant.now())));
+        when(entityTemplate.insert(any(Team.class))).thenReturn(Mono.just(savedTeam));
+        when(entityTemplate.insert(any(TeamMember.class))).thenReturn(Mono.just(new TeamMember(UUID.randomUUID(), TEAM_ID, ALICE_ID, Role.OWNER, Instant.now())));
 
         StepVerifier.create(teamService.createTeam("Test Team"))
                 .expectNextMatches(team -> team.name().equals("Test Team") && team.createdBy().equals(ALICE_ID))

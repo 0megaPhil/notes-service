@@ -5,15 +5,12 @@ import com.notetaking.notes.domain.Role;
 import com.notetaking.notes.domain.Team;
 import com.notetaking.notes.domain.TeamMember;
 import com.notetaking.notes.domain.User;
-import com.notetaking.notes.repository.NoteRepository;
 import com.notetaking.notes.repository.TeamMemberRepository;
 import com.notetaking.notes.repository.TeamRepository;
-import com.notetaking.notes.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -33,28 +30,20 @@ public class DemoDataSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(DemoDataSeeder.class);
 
-    private final UserRepository userRepository;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
-    private final NoteRepository noteRepository;
     private final R2dbcEntityTemplate entityTemplate;
 
     /**
-     * @param userRepository        users
      * @param teamRepository        teams
      * @param teamMemberRepository  memberships
-     * @param noteRepository        notes
      * @param entityTemplate        for explicit INSERTs (prevents .save treating fixed-ID entities as updates)
      */
-    public DemoDataSeeder(UserRepository userRepository,
-                          TeamRepository teamRepository,
+    public DemoDataSeeder(TeamRepository teamRepository,
                           TeamMemberRepository teamMemberRepository,
-                          NoteRepository noteRepository,
                           R2dbcEntityTemplate entityTemplate) {
-        this.userRepository = userRepository;
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
-        this.noteRepository = noteRepository;
         this.entityTemplate = entityTemplate;
     }
 
@@ -89,6 +78,9 @@ public class DemoDataSeeder {
                 .then(entityTemplate.insert(new Note(UUID.randomUUID(), "Team meeting notes - Sprint 42",
                         "## Agenda\n- Release timeline\n- Tech debt items\n- On-call rotation",
                         alice.id(), null, now, now, null)))
+                .then(entityTemplate.insert(new Note(UUID.randomUUID(), "Carol's personal note",
+                        "Reminder for Carol: prepare the Q4 budget draft.",
+                        carol.id(), null, now, now, null)))
                 .then(entityTemplate.insert(new Team(
                         engineeringTeamId,
                         "Engineering",
@@ -98,11 +90,16 @@ public class DemoDataSeeder {
                 .flatMap(team -> {
                     TeamMember aliceOwner = new TeamMember(UUID.randomUUID(), team.id(), alice.id(), Role.OWNER, now);
                     TeamMember bobMember = new TeamMember(UUID.randomUUID(), team.id(), bob.id(), Role.MEMBER, now);
+                    TeamMember carolMember = new TeamMember(UUID.randomUUID(), team.id(), carol.id(), Role.MEMBER, now);
                     return entityTemplate.insert(aliceOwner)
                             .then(entityTemplate.insert(bobMember))
+                            .then(entityTemplate.insert(carolMember))
                             .thenReturn(team);
                 })
-                // (team-scoped note omitted to avoid intermittent FK visibility issue during async seed; can be created via UI)
+                .flatMap(team -> entityTemplate.insert(new Note(UUID.randomUUID(), "Carol's team note",
+                        "Action items from last retro - shared with the whole Engineering team.",
+                        carol.id(), team.id(), now, now, null))
+                        .thenReturn(team))
                 .then()
                 .doOnSuccess(v -> log.info("Demo data seeding completed successfully."))
                 .doOnError(e -> log.error("Demo data seeding failed", e));

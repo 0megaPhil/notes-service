@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -42,6 +43,9 @@ class NoteServiceTest {
     @Mock
     private CurrentUserService currentUserService;
 
+    @Mock
+    private R2dbcEntityTemplate entityTemplate;
+
     @InjectMocks
     private NoteService noteService;
 
@@ -62,7 +66,7 @@ class NoteServiceTest {
     @Test
     void createNoteReturnsSavedNote() {
         Note savedNote = new Note(UUID.randomUUID(), "Test Title", "Test Content", ALICE_ID, null, Instant.now(), Instant.now(), null);
-        when(noteRepository.save(any(Note.class))).thenReturn(Mono.just(savedNote));
+        when(entityTemplate.insert(any(Note.class))).thenReturn(Mono.just(savedNote));
 
         StepVerifier.create(noteService.createNote("Test Title", "Test Content", null))
                 .expectNextMatches(note -> note.title().equals("Test Title"))

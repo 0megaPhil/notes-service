@@ -1,5 +1,23 @@
 # Team Notes Service
 
+**TL;DR — Any Engineer Can Run This:**
+
+```powershell
+# Terminal 1 — Backend with demo data
+.\mvnw.cmd spring-boot:run -Dspring.profiles.active=dev
+
+# Terminal 2
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:5173 (or GraphiQL at http://localhost:8080/graphiql).
+
+See the **Quick Start** section immediately below for reset steps, clean DB mode, and curl examples.
+
+---
+
 Reactive backend for a note-taking application used and shared by several small teams.
 
 Built with:
@@ -79,15 +97,99 @@ This service provides:
 - Advanced RBAC or granular permissions
 - Pagination cursors (simple offset/limit for now)
 
-## Running the Full Stack
+## Quick Start (Any Engineer Can Run This)
 
-This project uses **Maven** (wrapper scripts are committed).
+### Prerequisites
+- Java 21+ (run `java -version`)
+- Node.js 18+ and npm (run `node --version`)
+- (Optional) Docker if you want to try Postgres
 
-**Backend + Frontend together:**
-1. `./mvnw spring-boot:run` (backend on 8080)
-2. `cd frontend && npm run dev` (frontend on 5173)
+No other installs required — Maven wrapper is included.
 
-See the dedicated "Impressive Frontend" section below for details.
+### 1. Run Backend with Demo Data (Recommended)
+
+**Windows (PowerShell):**
+```powershell
+.\mvnw.cmd spring-boot:run -Dspring.profiles.active=dev
+```
+
+**macOS / Linux:**
+```bash
+./mvnw spring-boot:run -Dspring.profiles.active=dev
+```
+
+- First run may take a minute (Maven downloading dependencies).
+- Backend listens on **http://localhost:8080**
+- Demo data is automatically loaded (Alice, Bob, Carol + Engineering team + notes)
+- GraphiQL available at http://localhost:8080/graphiql
+
+Wait for the **"Demo data seeding completed successfully"** message + "Started ..." before using the UI or GraphiQL.
+
+**To start with a completely clean (empty) database** instead of demo data:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+### 2. Run the Frontend
+
+In a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend available at **http://localhost:5173**.
+
+The UI will automatically log in as Alice using the demo JWT flow.
+
+### 3. Reset Everything (Clean Slate)
+
+Stop the backend, then:
+
+**Windows:**
+```powershell
+Remove-Item -Recurse -Force target\h2
+```
+
+**macOS / Linux:**
+```bash
+rm -rf target/h2
+```
+
+Restart the backend (with the dev profile) to get a fresh seeded database. Data in the file-based H2 survives restarts until you delete this directory.
+
+### Using the API Directly
+
+**Simplest (demo mode):**
+
+Use header `X-User-Id: 11111111-1111-1111-1111-111111111111`
+
+**Proper JWT flow (what the frontend uses):**
+
+```powershell
+# Login as Bob
+$body = @{ userId = "22222222-2222-2222-2222-222222222222" } | ConvertTo-Json
+$token = (Invoke-RestMethod -Uri http://localhost:8080/auth/login -Method Post -Body $body -ContentType "application/json").token
+
+# Then use the token
+$headers = @{ Authorization = "Bearer $token" }
+Invoke-RestMethod -Uri http://localhost:8080/graphql -Method Post -Headers $headers -Body '{"query":"{ myTeams { id name } }"}' -ContentType "application/json"
+```
+
+### Quick GraphiQL Test
+1. Start backend with the dev profile.
+2. Open http://localhost:8080/graphiql.
+3. In the **Headers** tab (bottom), paste:
+   ```json
+   { "X-User-Id": "11111111-1111-1111-1111-111111111111" }
+   ```
+4. Run:
+   ```graphql
+   query { myTeams { id name } }
+   ```
 
 ### Data Seeding & Independent Core Logic
 
@@ -99,70 +201,33 @@ Demo data initialization (users, teams, and sample notes) has been **completely 
 
 **How to enable demo data:**
 
-```bash
-# Option 1: Enable via system property (recommended for one-off runs)
-./mvnw spring-boot:run -Dapp.data.seed-demo=true
-
-# Option 2: Use the dev profile (recommended for local development)
-./mvnw spring-boot:run -Dspring.profiles.active=dev
-```
-
-The `application-dev.yml` profile enables seeding automatically.
+See the **Quick Start** section at the top of this README.
 
 **Why this separation?**
-- Core logic (note CRUD, team membership, permission checks) should not depend on demo data existing.
-- Production deployments must never accidentally load demo data.
-- Tests can run against a pristine schema.
-- You can still seed data manually in the future (e.g., via a management endpoint or Flyway) without touching application startup code.
+- Core logic should work without demo data.
+- Production deploys must not accidentally load demo data.
+- Tests run against a clean database.
 
-The seeding logic lives in its own `DemoDataSeeder` service, invoked only by a conditional `CommandLineRunner` when the property is enabled.
+Demo data is loaded via a conditional `CommandLineRunner` only when `app.data.seed-demo=true` (or the `dev` profile).
 
-### 1. Quick Start (Recommended - H2, zero external deps)
-
-```bash
-./mvnw spring-boot:run
-```
-
-Or on Windows:
-
-```powershell
-.\mvnw.cmd spring-boot:run
-```
-
-**Note:** BlockHound is active. The app will crash on startup (or during request handling) with a clear `BlockingOperationError` + stack trace if any blocking code is called from a Reactor thread.
-
-Alternative with system Maven:
-
-```bash
-mvn spring-boot:run
-```
-
-The service starts on http://localhost:8080
-
-GraphiQL (playground): http://localhost:8080/graphiql
-
-### 2. With PostgreSQL (more realistic)
+### Running with PostgreSQL (more realistic)
 
 ```bash
 docker compose up -d
 ```
 
-Then edit `src/main/resources/application.yml` and switch the `r2dbc` section to use Postgres, or create `application-local.yml`.
+Then either:
+- Use the `dev` profile (still uses H2 by default), or
+- Edit `src/main/resources/application.yml` to switch the `r2dbc` section to Postgres.
 
-Then run the app.
+### Using the API (Authentication)
 
-### 3. Using the API (Demo Authentication)
+The backend supports two convenient methods during development:
 
-All requests **must** include the header:
+1. **X-User-Id header** (simplest for GraphiQL / curl / testing)
+2. **JWT Bearer token** (what the real frontend uses)
 
-```
-X-User-Id: 11111111-1111-1111-1111-111111111111
-```
-
-Demo users seeded:
-- `11111111-1111-1111-1111-111111111111` — Alice (owner of Engineering team)
-- `22222222-2222-2222-2222-222222222222` — Bob
-- `33333333-3333-3333-3333-333333333333` — Carol
+See the **Quick Start** section at the top of this README for the fastest way to get started with either method. Demo users are only present when seeding is enabled (`-Dspring.profiles.active=dev` or `seed-demo=true`).
 
 ## GraphQL Examples
 
@@ -381,29 +446,13 @@ These improvements would move us from "works for a demo" to "enterprise-grade ob
 
 ## How to Test
 
-### Backend (GraphiQL / curl)
-1. Start the app (`./mvnw spring-boot:run`).
-2. Open GraphiQL at http://localhost:8080/graphiql.
-3. For demo mode, use the `X-User-Id` header.
-4. For real JWT flow, first login:
+See the **Quick Start** section near the top of this README — it contains the clearest copy-paste instructions for both backend + frontend and direct API usage (with and without JWT).
 
-```bash
-curl -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"userId": "11111111-1111-1111-1111-111111111111"}'
-```
-
-Then use the returned token:
-
-```bash
-curl -X POST http://localhost:8080/graphql \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <token-from-login>" \
-  -d '{"query": "{ myNotes { id title } }"}'
-```
+### GraphiQL
+See the **Quick GraphiQL Test** section in the Quick Start above.
 
 ### Frontend
-See the "Impressive Frontend" section above. The UI handles the full JWT login flow automatically.
+See the "Impressive Frontend" section below. The UI does the full JWT login flow automatically.
 
 ## Potential Improvements / Next Steps
 
@@ -435,13 +484,20 @@ See the "Impressive Frontend" section above. The UI handles the full JWT login f
 ```
 
 Or with system Maven: `mvn test`
-```
 
-Also, full package (produces runnable JAR):
+Full package (produces runnable JAR):
 
 ```bash
 ./mvnw clean package -DskipTests
 ```
+
+## Common Gotchas (Read This!)
+
+- **BlockHound**: Any blocking call on a Reactor thread crashes the JVM with a clear `BlockingOperationError`. This is by design.
+- **No demo data?** You must start with `-Dspring.profiles.active=dev` **or** `-Dapp.data.seed-demo=true`.
+- **Stale data?** Stop backend and run `Remove-Item -Recurse -Force target\h2` (or `rm -rf target/h2`), then restart.
+- **Frontend 404s or connection refused?** Backend must be running on port 8080. Also run `npm install` inside the `frontend/` directory at least once.
+- **PowerShell "NonInteractive mode" errors** only happen in automated background verification scripts. Normal terminal usage works fine.
 
 ## Source Code & Tests
 
@@ -464,19 +520,24 @@ A modern, feature-rich single-page application is included in the `frontend/` di
 - Sidebar for teams, live search, full CRUD for notes, team member management.
 - Loading states, toasts, responsive design, smooth interactions.
 
-### Running the Full Stack
-```bash
-# Terminal 1: Backend
-cd notes-service
-./mvnw spring-boot:run
+### Running the Full Stack (Detailed)
 
-# Terminal 2: Frontend
-cd notes-service/frontend
+See the **Quick Start** section at the very top of this README for the recommended commands.
+
+If you prefer the long version:
+
+```powershell
+# Terminal 1
+cd C:\Users\...\notes-service
+.\mvnw.cmd spring-boot:run -Dspring.profiles.active=dev
+
+# Terminal 2
+cd frontend
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173. The UI automatically logs in via the new JWT endpoint.
+Open http://localhost:5173.
 
 ### How the Frontend Interfaces with the Backend
 
