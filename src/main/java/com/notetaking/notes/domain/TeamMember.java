@@ -1,6 +1,7 @@
 package com.notetaking.notes.domain;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.Instant;
@@ -18,8 +19,8 @@ import java.util.UUID;
 @Table("TEAM_MEMBERS")
 public record TeamMember(
     @Id UUID id,
-    UUID teamId,
-    UUID userId,
+    @Column("TEAM_ID") UUID teamId,
+    @Column("USER_ID") UUID userId,
     Role role,
-    Instant joinedAt
+    @Column("JOINED_AT") Instant joinedAt
 ) {}

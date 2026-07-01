@@ -8,6 +8,7 @@ import com.notetaking.notes.repository.TeamMemberRepository;
 import com.notetaking.notes.security.CurrentUserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -29,16 +30,19 @@ public class NoteService {
     private final NoteRepository noteRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final CurrentUserService currentUserService;
+    private final R2dbcEntityTemplate entityTemplate;
 
     /**
      * Constructs the service with required repositories.
      */
     public NoteService(NoteRepository noteRepository,
                        TeamMemberRepository teamMemberRepository,
-                       CurrentUserService currentUserService) {
+                       CurrentUserService currentUserService,
+                       R2dbcEntityTemplate entityTemplate) {
         this.noteRepository = noteRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.currentUserService = currentUserService;
+        this.entityTemplate = entityTemplate;
     }
 
     /**
@@ -144,7 +148,7 @@ public class NoteService {
                         null
                     ));
             })
-            .flatMap(noteRepository::save);
+            .flatMap(entityTemplate::insert);
     }
 
     /**

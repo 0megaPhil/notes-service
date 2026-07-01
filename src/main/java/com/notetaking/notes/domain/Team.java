@@ -1,6 +1,7 @@
 package com.notetaking.notes.domain;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.Instant;
@@ -18,6 +19,6 @@ import java.util.UUID;
 public record Team(
     @Id UUID id,
     String name,
-    UUID createdBy,
+    @Column("CREATED_BY") UUID createdBy,
     Instant createdAt
 ) {}

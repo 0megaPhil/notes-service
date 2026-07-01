@@ -40,6 +40,8 @@ CREATE INDEX IF NOT EXISTS idx_notes_team ON notes(team_id);
 CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
 
 -- Minimal users for FK constraints in tests (and demo)
+-- Carol is also pre-created so the seeder doesn't need to insert users (avoids PK conflicts with insert after schema init)
 MERGE INTO users (id, name, email, created_at) KEY (id) VALUES
  ('11111111-1111-1111-1111-111111111111', 'Alice', 'alice@example.com', CURRENT_TIMESTAMP),
- ('22222222-2222-2222-2222-222222222222', 'Bob', 'bob@example.com', CURRENT_TIMESTAMP);
+ ('22222222-2222-2222-2222-222222222222', 'Bob', 'bob@example.com', CURRENT_TIMESTAMP),
+ ('33333333-3333-3333-3333-333333333333', 'Carol', 'carol@example.com', CURRENT_TIMESTAMP);

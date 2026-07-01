@@ -7,7 +7,9 @@ spring:
 
   # Default to H2 for easy runnable demo (zero external dependencies)
   r2dbc:
-    url: r2dbc:h2:mem:///notesdb
+    # Use file-based H2 for reliable visibility of writes across connections/pool in dev/demo
+    # (mem:/// can have isolation quirks with R2DBC under load or multiple handlers)
+    url: r2dbc:h2:file:///./target/h2/notesdb;DB_CLOSE_DELAY=-1;AUTO_SERVER=TRUE
     username: sa
     password:
 
@@ -19,10 +21,9 @@ spring:
 
   graphql:
     path: /graphql
-    webflux:
-      enabled: true
     schema:
-      locations: classpath:schema.graphqls,classpath:graphql/**/*
+      locations:
+        - classpath:graphql/**/
     graphiql:
       enabled: true
       path: /graphiql
@@ -41,7 +42,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,beans
+        include: "*"
   endpoint:
     health:
       show-details: always

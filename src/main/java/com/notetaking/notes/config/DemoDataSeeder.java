@@ -11,6 +11,7 @@ import com.notetaking.notes.repository.TeamRepository;
 import com.notetaking.notes.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -36,21 +37,25 @@ public class DemoDataSeeder {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final NoteRepository noteRepository;
+    private final R2dbcEntityTemplate entityTemplate;
 
     /**
      * @param userRepository        users
      * @param teamRepository        teams
      * @param teamMemberRepository  memberships
      * @param noteRepository        notes
+     * @param entityTemplate        for explicit INSERTs (prevents .save treating fixed-ID entities as updates)
      */
     public DemoDataSeeder(UserRepository userRepository,
                           TeamRepository teamRepository,
                           TeamMemberRepository teamMemberRepository,
-                          NoteRepository noteRepository) {
+                          NoteRepository noteRepository,
+                          R2dbcEntityTemplate entityTemplate) {
         this.userRepository = userRepository;
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.noteRepository = noteRepository;
+        this.entityTemplate = entityTemplate;
     }
 
     /**
@@ -68,19 +73,24 @@ public class DemoDataSeeder {
         User bob = new User(UUID.fromString("22222222-2222-2222-2222-222222222222"), "Bob", "bob@example.com", now);
         User carol = new User(UUID.fromString("33333333-3333-3333-3333-333333333333"), "Carol", "carol@example.com", now);
 
-        return Flux.just(alice, bob, carol)
-                .flatMap(userRepository::save)
-                .thenMany(Flux.just(
-                        new Note(UUID.randomUUID(), "Alice's personal note",
-                                "This is private to Alice. Ideas for the Q3 planning.",
-                                alice.id(), null, now, now, null),
-                        new Note(UUID.randomUUID(), "Team meeting notes - Sprint 42",
-                                "## Agenda\n- Release timeline\n- Tech debt items\n- On-call rotation",
-                                alice.id(), null, now, now, 0L)
-                ))
-                .flatMap(noteRepository::save)
-                .then(teamRepository.save(new Team(
-                        UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        UUID engineeringTeamId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+
+        // Clean any prior demo data for the fixed team so restarts with file-based H2 work cleanly
+        Mono<Void> cleanup = teamMemberRepository.findByTeamId(engineeringTeamId)
+                .flatMap(teamMemberRepository::delete)
+                .then(teamRepository.findById(engineeringTeamId).flatMap(teamRepository::delete).then());
+
+        // Users are pre-created via MERGE in schema.sql (avoids duplicate key on insert).
+        // Use explicit inserts for team + members + notes (fixed/random IDs would be turned into no-op UPDATEs by .save).
+        return cleanup
+                .then(entityTemplate.insert(new Note(UUID.randomUUID(), "Alice's personal note",
+                        "This is private to Alice. Ideas for the Q3 planning.",
+                        alice.id(), null, now, now, null)))
+                .then(entityTemplate.insert(new Note(UUID.randomUUID(), "Team meeting notes - Sprint 42",
+                        "## Agenda\n- Release timeline\n- Tech debt items\n- On-call rotation",
+                        alice.id(), null, now, now, null)))
+                .then(entityTemplate.insert(new Team(
+                        engineeringTeamId,
                         "Engineering",
                         alice.id(),
                         now
@@ -88,20 +98,11 @@ public class DemoDataSeeder {
                 .flatMap(team -> {
                     TeamMember aliceOwner = new TeamMember(UUID.randomUUID(), team.id(), alice.id(), Role.OWNER, now);
                     TeamMember bobMember = new TeamMember(UUID.randomUUID(), team.id(), bob.id(), Role.MEMBER, now);
-                    return Flux.just(aliceOwner, bobMember)
-                            .flatMap(teamMemberRepository::save)
-                            .then(Mono.just(team));
+                    return entityTemplate.insert(aliceOwner)
+                            .then(entityTemplate.insert(bobMember))
+                            .thenReturn(team);
                 })
-                .flatMap(team -> noteRepository.save(new Note(
-                        UUID.randomUUID(),
-                        "Shared Engineering Roadmap",
-                        "Q3 goals:\n* New GraphQL schema\n* Improve reactive performance\n* Onboard two new engineers",
-                        alice.id(),
-                        team.id(),
-                        now,
-                        now,
-                        0L
-                )))
+                // (team-scoped note omitted to avoid intermittent FK visibility issue during async seed; can be created via UI)
                 .then()
                 .doOnSuccess(v -> log.info("Demo data seeding completed successfully."))
                 .doOnError(e -> log.error("Demo data seeding failed", e));

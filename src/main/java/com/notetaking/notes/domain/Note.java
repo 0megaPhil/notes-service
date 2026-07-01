@@ -2,6 +2,7 @@ package com.notetaking.notes.domain;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Version;
+import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.Instant;
@@ -26,10 +27,10 @@ public record Note(
     @Id UUID id,
     String title,
     String content,
-    UUID ownerId,
-    UUID teamId,           // null = personal note
-    Instant createdAt,
-    Instant updatedAt,
+    @Column("OWNER_ID") UUID ownerId,
+    @Column("TEAM_ID") UUID teamId,           // null = personal note
+    @Column("CREATED_AT") Instant createdAt,
+    @Column("UPDATED_AT") Instant updatedAt,
     @Version Long version   // Optimistic locking - good practice
 ) {
     /**

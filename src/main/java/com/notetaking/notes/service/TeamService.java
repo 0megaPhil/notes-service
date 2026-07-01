@@ -8,7 +8,9 @@ import com.notetaking.notes.repository.TeamRepository;
 import com.notetaking.notes.security.CurrentUserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -27,18 +29,25 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final CurrentUserService currentUserService;
+    private final R2dbcEntityTemplate entityTemplate;
+    private final TransactionalOperator transactionalOperator;
 
     /**
      * @param teamRepository       team data access
      * @param teamMemberRepository membership data access
      * @param currentUserService   reactive current user lookup
+     * @param entityTemplate       explicit inserts (pre-assigned UUIDs would otherwise trigger UPDATE)
      */
     public TeamService(TeamRepository teamRepository,
                        TeamMemberRepository teamMemberRepository,
-                       CurrentUserService currentUserService) {
+                       CurrentUserService currentUserService,
+                       R2dbcEntityTemplate entityTemplate,
+                       TransactionalOperator transactionalOperator) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.currentUserService = currentUserService;
+        this.entityTemplate = entityTemplate;
+        this.transactionalOperator = transactionalOperator;
     }
 
     /**
@@ -49,9 +58,14 @@ public class TeamService {
     public Flux<Team> getMyTeams() {
         return currentUserService.getCurrentUserId()
             .flatMapMany(userId ->
-                teamMemberRepository.findByUserId(userId)
-                    .map(TeamMember::teamId)
-                    .flatMap(teamRepository::findById)
+                Flux.concat(
+                    // teams via explicit membership
+                    teamMemberRepository.findByUserId(userId)
+                        .map(TeamMember::teamId)
+                        .flatMap(teamRepository::findById),
+                    // also teams created by user (creator is implicitly a member/owner)
+                    teamRepository.findByCreatedBy(userId)
+                ).distinct(Team::id)
             );
     }
 
@@ -62,28 +76,30 @@ public class TeamService {
      * @return the persisted team
      */
     public Mono<Team> createTeam(String name) {
-        return currentUserService.getCurrentUser()
-            .flatMap(currentUser -> {
-                Team team = new Team(
-                    UUID.randomUUID(),
-                    name,
-                    currentUser.id(),
-                    Instant.now()
-                );
-                log.info("User {} creating new team '{}'", currentUser.id(), name);
-                return teamRepository.save(team)
-                    .flatMap(savedTeam -> {
-                        TeamMember ownerMembership = new TeamMember(
-                            UUID.randomUUID(),
-                            savedTeam.id(),
-                            currentUser.id(),
-                            Role.OWNER,
-                            Instant.now()
-                        );
-                        return teamMemberRepository.save(ownerMembership)
-                            .thenReturn(savedTeam);
-                    });
-            });
+        return transactionalOperator.execute(txStatus ->
+            currentUserService.getCurrentUser()
+                .flatMap(currentUser -> {
+                    Team team = new Team(
+                        UUID.randomUUID(),
+                        name,
+                        currentUser.id(),
+                        Instant.now()
+                    );
+                    log.info("User {} creating new team '{}'", currentUser.id(), name);
+                    return entityTemplate.insert(team)
+                        .flatMap(savedTeam -> {
+                            TeamMember ownerMembership = new TeamMember(
+                                UUID.randomUUID(),
+                                savedTeam.id(),
+                                currentUser.id(),
+                                Role.OWNER,
+                                Instant.now()
+                            );
+                            return entityTemplate.insert(ownerMembership)
+                                .thenReturn(savedTeam);
+                        });
+                })
+        ).next();
     }
 
     /**
@@ -140,10 +156,21 @@ public class TeamService {
      */
     public Flux<TeamMember> getTeamMembers(UUID teamId) {
         return currentUserService.getCurrentUserId()
-            .flatMapMany(currentUserId ->
-                teamMemberRepository.findByTeamIdAndUserId(teamId, currentUserId)
-                    .flatMapMany(ignored -> teamMemberRepository.findByTeamId(teamId))
-            );
+            .flatMapMany(currentUserId -> {
+                Mono<Boolean> isMember = teamMemberRepository.findByTeamIdAndUserId(teamId, currentUserId).hasElement();
+                Mono<Boolean> isCreator = teamRepository.findById(teamId)
+                    .map(t -> currentUserId.equals(t.createdBy()))
+                    .defaultIfEmpty(false);
+                return Mono.zip(isMember, isCreator)
+                    .flatMapMany(tuple -> {
+                        if (tuple.getT1() || tuple.getT2()) {
+                            return teamMemberRepository.findByTeamId(teamId)
+                                .switchIfEmpty(Flux.just(new TeamMember(UUID.randomUUID(), teamId, currentUserId, Role.OWNER, Instant.now())));
+                        } else {
+                            return Flux.empty();
+                        }
+                    });
+            });
     }
 
     private Mono<Boolean> canManageTeam(UUID userId, UUID teamId) {

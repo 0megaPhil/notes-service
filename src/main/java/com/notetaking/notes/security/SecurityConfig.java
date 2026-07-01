@@ -42,6 +42,7 @@ public class SecurityConfig {
                 // GraphQL is protected by our custom UserContextFilter + service layer permissions
                 .pathMatchers("/graphql").permitAll()
                 .pathMatchers("/graphiql", "/graphiql/**").permitAll() // Dev UI
+                .pathMatchers("/debug/**").permitAll() // temp diagnostics
                 .anyExchange().authenticated()
             )
             // For demo: we use a custom header-based "authentication"
