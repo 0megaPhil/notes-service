@@ -26,12 +26,17 @@ public class DataInitializer {
     }
 
     /**
-     * Returns the runner. Executes seeding in a non-blocking fire-and-forget fashion.
+     * Returns the runner.
+     * <p>
+     * For the demo/dev seed we deliberately block here so that "application started"
+     * means demo data is present. This makes automated checks, curl tests, and
+     * the first browser requests reliable without extra sleeps/races.
+     * (Production deploys keep seed-demo=false and do not use this path.)
      */
     @Bean
     CommandLineRunner init() {
         return args -> demoDataSeeder.seed()
                 .doOnError(e -> log.error("Demo data seeding failed", e))
-                .subscribe();  // Fire-and-forget to keep startup non-blocking
+                .block();   // Await completion so startup guarantees seeded data is visible
     }
 }
